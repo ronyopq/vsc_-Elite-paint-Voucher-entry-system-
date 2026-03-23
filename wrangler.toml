@@ -10,11 +10,12 @@ enabled = true
 ENVIRONMENT = "production"
 APP_DOMAIN = "https://vcelite.pages.dev"
 GOOGLE_REDIRECT_URI = "https://vcelite.pages.dev/auth/callback"
+SUPER_ADMIN_EMAILS = "rony.opq@gmail.com"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "elite-voucher"
-database_id = "40e424ff-b4ee-4225-be77-78070d21cc6c"
+database_id = "9d3f6d61-956c-4f86-849b-91c12efffd28"
 
 [[kv_namespaces]]
 binding = "KV_SESSIONS"

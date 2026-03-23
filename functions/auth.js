@@ -61,6 +61,17 @@ export async function handleAuthCallback(request, sessionManager, authHandler, d
       user = await db.getUser(userId);
     }
 
+    // Promote configured emails to super admin role
+    const superAdminEmails = String(env.SUPER_ADMIN_EMAILS || '')
+      .split(',')
+      .map(email => email.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (superAdminEmails.includes(String(user.email || '').toLowerCase()) && user.role !== 'super_admin') {
+      await db.updateUserRole(user.id, 'super_admin');
+      user = await db.getUser(user.id);
+    }
+
     // Check if user is blocked
     if (user.is_blocked) {
       return new Response(JSON.stringify({ error: 'User account is blocked' }), {
