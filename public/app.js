@@ -627,12 +627,31 @@ class VoucherApp {
 }
 
 // Handle Google login
-function handleGoogleLogin() {
-  const loginBtn = document.getElementById('loginBtn');
+function setAuthLoading(method, isLoading) {
+  const googleBtn = document.getElementById('googleLoginBtn');
+  const localBtn = document.getElementById('localLoginBtn');
   const loading = document.getElementById('authLoading');
-  
-  loginBtn.style.display = 'none';
-  loading.style.display = 'block';
+  const loadingText = document.getElementById('authLoadingText');
+
+  if (isLoading) {
+    if (googleBtn) googleBtn.disabled = true;
+    if (localBtn) localBtn.disabled = true;
+    if (loadingText) {
+      loadingText.textContent = method === 'google'
+        ? 'Google লগইন পেজে পাঠানো হচ্ছে...'
+        : 'আপনার তথ্য যাচাই করা হচ্ছে...';
+    }
+    if (loading) loading.style.display = 'block';
+    return;
+  }
+
+  if (googleBtn) googleBtn.disabled = false;
+  if (localBtn) localBtn.disabled = false;
+  if (loading) loading.style.display = 'none';
+}
+
+function handleGoogleLogin() {
+  setAuthLoading('google', true);
 
   // Keep auth flow on the same domain so session cookie is available to the app.
   window.location.href = '/auth/login';
@@ -642,8 +661,6 @@ function handleGoogleLogin() {
 async function handleLocalLogin() {
   const loginIdInput = document.getElementById('localLoginId');
   const passwordInput = document.getElementById('localLoginPassword');
-  const loginBtn = document.getElementById('loginBtn');
-  const loading = document.getElementById('authLoading');
 
   const loginId = (loginIdInput?.value || '').trim();
   const password = passwordInput?.value || '';
@@ -655,8 +672,7 @@ async function handleLocalLogin() {
     return;
   }
 
-  loginBtn.style.display = 'none';
-  loading.style.display = 'block';
+  setAuthLoading('local', true);
 
   try {
     const response = await fetch('/auth/local-login', {
@@ -676,8 +692,7 @@ async function handleLocalLogin() {
     if (window.app) {
       window.app.showError(error.message || 'লগইন ব্যর্থ হয়েছে।');
     }
-    loginBtn.style.display = 'inline-flex';
-    loading.style.display = 'none';
+    setAuthLoading('local', false);
   }
 }
 
@@ -698,4 +713,14 @@ let app;
 document.addEventListener('DOMContentLoaded', () => {
   app = new VoucherApp();
   window.app = app;
+
+  const passwordInput = document.getElementById('localLoginPassword');
+  if (passwordInput) {
+    passwordInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        handleLocalLogin();
+      }
+    });
+  }
 });

@@ -15,87 +15,193 @@
 
     body {
       font-family: 'Noto Serif Bengali', serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background:
+        radial-gradient(circle at top left, rgba(255, 208, 152, 0.38), transparent 45%),
+        radial-gradient(circle at 85% 20%, rgba(147, 221, 205, 0.42), transparent 42%),
+        linear-gradient(160deg, #f6f8f5 0%, #edf3f0 52%, #e6eef3 100%);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 24px;
     }
 
     .auth-container {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      padding: 50px 40px;
-      max-width: 450px;
+      position: relative;
+      background: rgba(255, 255, 255, 0.88);
+      border-radius: 20px;
+      border: 1px solid rgba(30, 53, 72, 0.08);
+      box-shadow: 0 24px 55px rgba(21, 51, 68, 0.17);
+      padding: 34px;
+      max-width: 520px;
       width: 100%;
-      text-align: center;
+      text-align: left;
+      backdrop-filter: blur(6px);
     }
 
     .logo {
-      font-size: 36px;
-      margin-bottom: 20px;
+      width: 62px;
+      height: 62px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      font-size: 30px;
+      background: linear-gradient(145deg, #164a5f, #2b7f9f);
+      color: #fff;
+      margin-bottom: 16px;
+      box-shadow: 0 12px 24px rgba(22, 74, 95, 0.28);
     }
 
     .auth-container h1 {
-      font-size: 28px;
-      color: #333;
-      margin-bottom: 10px;
+      font-size: 30px;
+      color: #173042;
+      margin-bottom: 8px;
+      line-height: 1.2;
     }
 
     .auth-container p {
-      color: #666;
-      margin-bottom: 40px;
-      font-size: 16px;
+      color: #50606d;
+      margin-bottom: 24px;
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    .auth-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .field-group label {
+      display: block;
+      margin-bottom: 7px;
+      color: #1f3d4f;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .field-group input {
+      width: 100%;
+      border: 1px solid #c6d3db;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-family: 'Noto Serif Bengali', serif;
+      font-size: 15px;
+      color: #0f2d3f;
+      background: #fff;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .field-group input:focus {
+      outline: none;
+      border-color: #1f718f;
+      box-shadow: 0 0 0 3px rgba(31, 113, 143, 0.14);
     }
 
     .login-btn {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 12px;
-      background: white;
-      color: #333;
-      border: 2px solid #e0e0e0;
-      padding: 14px 30px;
-      border-radius: 8px;
-      font-size: 16px;
+      border: none;
+      padding: 13px 18px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
       font-family: 'Noto Serif Bengali', serif;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
       width: 100%;
       justify-content: center;
     }
 
     .login-btn:hover {
-      border-color: #667eea;
-      color: #667eea;
-      transform: translateY(-2px);
-      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .login-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .local-login-btn {
+      color: #fff;
+      background: linear-gradient(140deg, #17688a, #244c79);
+      box-shadow: 0 10px 24px rgba(23, 104, 138, 0.34);
+    }
+
+    .local-login-btn:hover {
+      filter: brightness(1.03);
+      box-shadow: 0 12px 26px rgba(23, 104, 138, 0.38);
+    }
+
+    .google-login-btn {
+      color: #173042;
+      background: #ffffff;
+      border: 1px solid #c7d4db;
+      box-shadow: 0 8px 20px rgba(17, 40, 56, 0.12);
+    }
+
+    .google-login-btn:hover {
+      border-color: #8ba8b8;
+      box-shadow: 0 10px 22px rgba(17, 40, 56, 0.16);
+    }
+
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #687a86;
+      font-size: 13px;
+      margin: 4px 0;
+    }
+
+    .auth-divider::before,
+    .auth-divider::after {
+      content: "";
+      height: 1px;
+      flex: 1;
+      background: #d5e0e5;
+    }
+
+    .hint-box {
+      margin-top: 2px;
+      background: #f4f9fb;
+      color: #315264;
+      border: 1px solid #d8e8ee;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .hint-box strong {
+      color: #173042;
+      font-size: 13px;
     }
 
     .features {
-      margin-top: 40px;
+      margin-top: 26px;
       text-align: left;
-      border-top: 1px solid #eee;
-      padding-top: 30px;
+      border-top: 1px solid #deeaef;
+      padding-top: 20px;
     }
 
     .features h3 {
-      font-size: 18px;
-      color: #333;
-      margin-bottom: 15px;
+      font-size: 17px;
+      color: #173042;
+      margin-bottom: 10px;
     }
 
     .features ul {
       list-style: none;
-      color: #666;
+      color: #4b5f6d;
       font-size: 14px;
     }
 
     .features li {
-      padding: 8px 0;
-      padding-left: 25px;
+      padding: 6px 0;
+      padding-left: 23px;
       position: relative;
     }
 
@@ -103,23 +209,30 @@
       content: "✓";
       position: absolute;
       left: 0;
-      color: #667eea;
+      color: #2b8a74;
       font-weight: bold;
     }
 
     .loading {
       display: none;
+      margin: 12px 0;
+      background: #f7fafb;
+      border: 1px solid #dbe8ee;
+      border-radius: 10px;
+      padding: 12px;
       text-align: center;
+      color: #355062;
+      font-size: 14px;
     }
 
     .spinner {
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #667eea;
+      border: 3px solid #dbe7ed;
+      border-top: 3px solid #1f718f;
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
+      width: 28px;
+      height: 28px;
       animation: spin 1s linear infinite;
-      margin: 0 auto 20px;
+      margin: 0 auto 8px;
     }
 
     @keyframes spin {
@@ -229,6 +342,17 @@
     .tab-content.active {
       display: block;
     }
+
+    @media (max-width: 640px) {
+      .auth-container {
+        padding: 24px 20px;
+        border-radius: 16px;
+      }
+
+      .auth-container h1 {
+        font-size: 24px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -238,31 +362,39 @@
   <div class="auth-container" id="authContainer">
     <div class="logo">🎫</div>
     <h1>এলিট পেইন্ট ভাউচার</h1>
-    <p>এন্ট্রি সিস্টেম এবং প্রিন্ট ম্যানেজমেন্ট</p>
+    <p>নিরাপদ লগইন করে ভাউচার এন্ট্রি, প্রিন্ট এবং রিপোর্ট কাজ শুরু করুন।</p>
 
-    <div class="loading" id="authLoading">
-      <div class="spinner"></div>
-      <p>লিঙ্ক হচ্ছে...</p>
-    </div>
+    <div class="auth-grid">
+      <div class="field-group">
+        <label for="localLoginId">লগইন আইডি</label>
+        <input id="localLoginId" type="text" placeholder="আপনার লগইন আইডি লিখুন" autocomplete="username" />
+      </div>
 
-    <button class="login-btn" id="loginBtn" onclick="handleGoogleLogin()">
-      <span>🔐</span>
-      <span>গুগল দিয়ে প্রবেশ করুন</span>
-    </button>
+      <div class="field-group">
+        <label for="localLoginPassword">পাসওয়ার্ড</label>
+        <input id="localLoginPassword" type="password" placeholder="আপনার পাসওয়ার্ড লিখুন" autocomplete="current-password" />
+      </div>
 
-    <div style="margin: 18px 0; color: #888; font-size: 14px;">অথবা</div>
-
-    <div style="text-align: left; margin-top: 8px;">
-      <label for="localLoginId" style="display:block; margin-bottom:6px; color:#444; font-size:14px;">লগইন আইডি</label>
-      <input id="localLoginId" type="text" placeholder="আপনার লগইন আইডি" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; margin-bottom:10px; font-family:'Noto Serif Bengali', serif;" />
-
-      <label for="localLoginPassword" style="display:block; margin-bottom:6px; color:#444; font-size:14px;">পাসওয়ার্ড</label>
-      <input id="localLoginPassword" type="password" placeholder="আপনার পাসওয়ার্ড" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; margin-bottom:12px; font-family:'Noto Serif Bengali', serif;" />
-
-      <button class="login-btn" onclick="handleLocalLogin()" style="width:100%; justify-content:center;">
+      <button class="login-btn local-login-btn" id="localLoginBtn" onclick="handleLocalLogin()">
         <span>👤</span>
         <span>আইডি/পাসওয়ার্ড দিয়ে লগইন</span>
       </button>
+
+      <div class="hint-box">
+        <strong>টেম্পোরারি লগইন মোড:</strong> আপাতত Google এর পরিবর্তে আইডি/পাসওয়ার্ড দিয়ে লগইন চালু আছে।
+      </div>
+
+      <div class="auth-divider">অথবা</div>
+
+      <button class="login-btn google-login-btn" id="googleLoginBtn" onclick="handleGoogleLogin()">
+        <span>🔐</span>
+        <span>গুগল দিয়ে প্রবেশ করুন</span>
+      </button>
+    </div>
+
+    <div class="loading" id="authLoading">
+      <div class="spinner"></div>
+      <p id="authLoadingText">অনুগ্রহ করে অপেক্ষা করুন...</p>
     </div>
 
     <div class="features">
