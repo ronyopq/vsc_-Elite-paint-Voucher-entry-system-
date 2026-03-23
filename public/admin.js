@@ -6,7 +6,7 @@ class AdminApp {
     this.users = [];
     this.stats = {};
     this.currentModal = null;
-    this.apiBase = '/api';
+    this.apiBase = '';
     this.init();
   }
 
@@ -73,7 +73,7 @@ class AdminApp {
 
   async loadDashboard() {
     try {
-      const response = await fetch(`${this.apiBase}/admin/users?limit=100`);
+      const response = await fetch(`${this.apiBase}/api/admin/users?limit=100`);
       const data = await response.json();
       this.users = data.users || [];
 
@@ -259,7 +259,7 @@ class AdminApp {
   async toggleBlock(userId, block) {
     if (confirm(`এই ব্যবহারকারীকে ${block ? 'ব্লক' : 'আনব্লক'} করতে চান?`)) {
       try {
-        const response = await fetch(`${this.apiBase}/admin/user/block`, {
+        const response = await fetch(`${this.apiBase}/api/admin/user/block`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, blocked: block })
@@ -293,7 +293,7 @@ class AdminApp {
       const days = document.getElementById('extensionDays').value;
       
       try {
-        const response = await fetch(`${this.apiBase}/admin/user/extend-trial`, {
+        const response = await fetch(`${this.apiBase}/api/admin/user/extend-trial`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: this.currentModal.userId, days: parseInt(days) })
@@ -312,7 +312,7 @@ class AdminApp {
 
   async loginAsUser(userId) {
     try {
-      const response = await fetch(`${this.apiBase}/admin/user/login-as`, {
+      const response = await fetch(`${this.apiBase}/api/admin/user/login-as`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId })

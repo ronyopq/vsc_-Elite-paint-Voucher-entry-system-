@@ -6,7 +6,7 @@ class VoucherApp {
     this.user = null;
     this.currentVoucher = null;
     this.voucherHistory = [];
-    this.apiBase = '/api';
+    this.apiBase = '';
     this.init();
   }
 
@@ -162,7 +162,7 @@ class VoucherApp {
     };
 
     try {
-      const response = await fetch(`${this.apiBase}/voucher/create`, {
+      const response = await fetch(`${this.apiBase}/api/voucher/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(voucherData)
@@ -210,7 +210,7 @@ class VoucherApp {
         particulars: 'particulars'
       };
 
-      const response = await fetch(`${this.apiBase}/suggest/${typeMap[field]}?q=${encodeURIComponent(value)}`);
+      const response = await fetch(`${this.apiBase}/api/suggest/${typeMap[field]}?q=${encodeURIComponent(value)}`);
       const data = await response.json();
 
       this.displaySuggestions(field, data.suggestions || []);
@@ -253,7 +253,7 @@ class VoucherApp {
     };
 
     try {
-      await fetch(`${this.apiBase}/suggest/${typeMap[field]}`, {
+      await fetch(`${this.apiBase}/api/suggest/${typeMap[field]}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value })
@@ -400,7 +400,7 @@ class VoucherApp {
 
   async loadVoucherHistory() {
     try {
-      const response = await fetch(`${this.apiBase}/voucher/all`);
+      const response = await fetch(`${this.apiBase}/api/voucher/all`);
       const data = await response.json();
 
       this.voucherHistory = data.vouchers || [];
@@ -499,7 +499,7 @@ class VoucherApp {
 
   async getUserStats() {
     try {
-      const response = await fetch(`${this.apiBase}/voucher/all?limit=1000`);
+      const response = await fetch(`${this.apiBase}/api/voucher/all?limit=1000`);
       if (!response.ok) return { total: 0, total_amount: 0 };
 
       const data = await response.json();
@@ -517,7 +517,7 @@ class VoucherApp {
 
   async viewVoucher(id) {
     try {
-      const response = await fetch(`${this.apiBase}/voucher/${id}`);
+      const response = await fetch(`${this.apiBase}/api/voucher/${id}`);
       const data = await response.json();
       this.currentVoucher = data.voucher;
       this.showVoucherPreview(data.voucher);
