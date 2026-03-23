@@ -634,12 +634,8 @@ function handleGoogleLogin() {
   loginBtn.style.display = 'none';
   loading.style.display = 'block';
 
-  const isProdPages = window.location.hostname === 'vcelite.pages.dev';
-  const loginUrl = isProdPages
-    ? 'https://elite-voucher-api.ronybd.workers.dev/auth/login'
-    : '/auth/login';
-
-  window.location.href = loginUrl;
+  // Keep auth flow on the same domain so session cookie is available to the app.
+  window.location.href = '/auth/login';
 }
 
 // Handle logout
