@@ -638,6 +638,49 @@ function handleGoogleLogin() {
   window.location.href = '/auth/login';
 }
 
+// Handle local login with ID/password
+async function handleLocalLogin() {
+  const loginIdInput = document.getElementById('localLoginId');
+  const passwordInput = document.getElementById('localLoginPassword');
+  const loginBtn = document.getElementById('loginBtn');
+  const loading = document.getElementById('authLoading');
+
+  const loginId = (loginIdInput?.value || '').trim();
+  const password = passwordInput?.value || '';
+
+  if (!loginId || !password) {
+    if (window.app) {
+      window.app.showError('লগইন আইডি এবং পাসওয়ার্ড দিন।');
+    }
+    return;
+  }
+
+  loginBtn.style.display = 'none';
+  loading.style.display = 'block';
+
+  try {
+    const response = await fetch('/auth/local-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginId, password })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'লগইন ব্যর্থ হয়েছে।');
+    }
+
+    window.location.href = result.redirectTo || '/dashboard';
+  } catch (error) {
+    if (window.app) {
+      window.app.showError(error.message || 'লগইন ব্যর্থ হয়েছে।');
+    }
+    loginBtn.style.display = 'inline-flex';
+    loading.style.display = 'none';
+  }
+}
+
 // Handle logout
 async function handleLogout() {
   if (confirm('লগ আউট করতে চাইছেন?')) {
@@ -654,4 +697,5 @@ async function handleLogout() {
 let app;
 document.addEventListener('DOMContentLoaded', () => {
   app = new VoucherApp();
+  window.app = app;
 });

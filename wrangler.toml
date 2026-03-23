@@ -10,6 +10,8 @@ enabled = true
 ENVIRONMENT = "production"
 APP_DOMAIN = "https://vcelite.pages.dev"
 GOOGLE_REDIRECT_URI = "https://vcelite.pages.dev/auth/callback"
+LOCAL_LOGIN_ID = "admin"
+LOCAL_LOGIN_ROLE = "super_admin"
 
 [[d1_databases]]
 binding = "DB"

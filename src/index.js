@@ -6,7 +6,7 @@ import { AuthHandler, SessionManager, requireAuth, requireAdmin, requireSuperAdm
 import { generateId, generatePublicId, getLocalDateString } from '../shared/utils.js';
 
 // Import route handlers
-import { handleAuthLogin, handleAuthCallback, handleAuthLogout, handleAuthUser } from '../functions/auth.js';
+import { handleAuthLogin, handleAuthCallback, handleAuthLogout, handleAuthUser, handleLocalLogin } from '../functions/auth.js';
 import { handleVoucherCreate, handleVoucherGet, handleVoucherGetAll, handleVoucherPublic } from '../functions/voucher.js';
 import { handleSuggestGet, handleSuggestAdd } from '../functions/suggest.js';
 import { handleAdminUsers, handleAdminBlock, handleAdminExtendTrial, handleAdminLoginAs } from '../functions/admin.js';
@@ -52,6 +52,8 @@ export default {
       if (route === 'auth') {
         if (subpath === 'login') {
           return handleAuthLogin(request, sessionManager, authHandler, env);
+        } else if (subpath === 'local-login' && request.method === 'POST') {
+          return handleLocalLogin(request, sessionManager, db, env);
         } else if (subpath === 'callback') {
           return handleAuthCallback(request, sessionManager, authHandler, db, env);
         } else if (subpath === 'logout') {
