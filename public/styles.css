@@ -64,6 +64,36 @@ body {
   min-height: 100px;
 }
 
+/* Particulars Grid Styles */
+.particulars-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.particular-input {
+  padding: 11px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-family: 'Inter', 'Noto Serif Bengali', sans-serif;
+  font-size: 14px;
+  color: #0f172a;
+  background: #f8fafc;
+  transition: all 0.3s ease;
+}
+
+.particular-input:focus {
+  outline: none;
+  border-color: #1e40af;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+
+.particular-input::placeholder {
+  color: #94a3b8;
+}
+
 .amount-words {
   margin-top: 8px;
   font-size: 12px;

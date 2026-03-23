@@ -117,8 +117,13 @@ class VoucherApp {
 
         <div class="form-group full-width">
           <label>বিবরণ (বিশেষ তথ্য) *</label>
-          <textarea id="particulars" placeholder="বিস্তারিত বিবরণ" required></textarea>
-          <ul class="suggestions" id="particularsSuggestions"></ul>
+          <div class="particulars-grid">
+            <input type="text" id="particular1" class="particular-input" placeholder="প্রথম বিবরণ" />
+            <input type="text" id="particular2" class="particular-input" placeholder="দ্বিতীয় বিবরণ" />
+            <input type="text" id="particular3" class="particular-input" placeholder="তৃতীয় বিবরণ" />
+            <input type="text" id="particular4" class="particular-input" placeholder="চতুর্থ বিবরণ" />
+            <input type="text" id="particular5" class="particular-input" placeholder="পঞ্চম বিবরণ" />
+          </div>
         </div>
 
         <div class="form-row">
@@ -153,7 +158,7 @@ class VoucherApp {
     document.getElementById('voucherEntryForm').addEventListener('submit', (e) => this.handleVoucherSubmit(e));
 
     // Setup auto-suggestions
-    ['payTo', 'codeNo', 'controlAc', 'particulars'].forEach(field => {
+    ['payTo', 'codeNo', 'controlAc'].forEach(field => {
       const input = document.getElementById(field);
       if (input) {
         input.addEventListener('input', (e) => this.getSuggestions(field, e.target.value));
@@ -170,13 +175,27 @@ class VoucherApp {
   async handleVoucherSubmit(e) {
     e.preventDefault();
 
+    // Collect particulars from 5 fields
+    const particulars = [
+      document.getElementById('particular1').value.trim(),
+      document.getElementById('particular2').value.trim(),
+      document.getElementById('particular3').value.trim(),
+      document.getElementById('particular4').value.trim(),
+      document.getElementById('particular5').value.trim()
+    ].filter(p => p).join(' | ');
+
+    if (!particulars) {
+      this.showError('অন্তত একটি বিবরণ প্রয়োজন।');
+      return;
+    }
+
     const voucherData = {
       date: document.getElementById('date').value,
       voucherNo: document.getElementById('voucherNo').value,
       payTo: document.getElementById('payTo').value,
       codeNo: document.getElementById('codeNo').value,
       controlAc: document.getElementById('controlAc').value,
-      particulars: document.getElementById('particulars').value,
+      particulars: particulars,
       amount: parseFloat(document.getElementById('amount').value),
       accountNo: document.getElementById('accountNo').value,
       paymentMethod: document.getElementById('paymentMethod').value
