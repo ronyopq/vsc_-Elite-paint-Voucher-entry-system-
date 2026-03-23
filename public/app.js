@@ -394,11 +394,281 @@ class VoucherApp {
   }
 
   renderVoucher(voucher, containerId) {
-    // This will be implemented in voucher-renderer.js
     const container = document.getElementById(containerId);
-    if (window.VoucherRenderer) {
-      window.VoucherRenderer.render(container, voucher);
-    }
+    const particulars = voucher.particulars.split(' | ').filter(p => p.trim());
+    
+    // Ensure 5 rows
+    while (particulars.length < 5) particulars.push('');
+    particulars.length = 5;
+
+    const memoHTML = `
+      <style>
+        .voucher-memo {
+          width: 900px;
+          background: white;
+          font-family: Arial, sans-serif;
+          padding: 30px;
+          margin: 20px auto;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          color: #000;
+        }
+        .memo-header {
+          text-align: center;
+          margin-bottom: 20px;
+          border-bottom: 2px solid #000;
+          padding-bottom: 15px;
+        }
+        .company-name {
+          font-weight: bold;
+          font-size: 16px;
+          margin-bottom: 3px;
+        }
+        .company-address {
+          font-size: 11px;
+          line-height: 1.3;
+          margin-bottom: 3px;
+        }
+        .voucher-type {
+          font-weight: bold;
+          font-size: 14px;
+          margin: 5px 0;
+          border: 2px solid #000;
+          padding: 5px 15px;
+          display: inline-block;
+          border-radius: 3px;
+        }
+        .header-info {
+          text-align: right;
+          font-size: 12px;
+          margin-top: 10px;
+        }
+        .header-field {
+          margin: 5px 0;
+        }
+        .field-label {
+          font-weight: bold;
+          display: inline-block;
+          width: 100px;
+        }
+        .field-value {
+          border-bottom: 1px solid #000;
+          display: inline-block;
+          width: 150px;
+          text-align: center;
+        }
+        .form-fields {
+          margin: 15px 0;
+          font-size: 12px;
+        }
+        .form-row {
+          margin-bottom: 10px;
+          display: flex;
+          gap: 20px;
+          align-items: center;
+        }
+        .form-row-full {
+          margin-bottom: 10px;
+        }
+        .row-label {
+          font-weight: bold;
+          min-width: 110px;
+        }
+        .row-value {
+          flex: 1;
+          border-bottom: 1px solid #000;
+          min-height: 18px;
+        }
+        .memo-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 20px 0;
+          font-size: 12px;
+        }
+        .memo-table th {
+          border: 1px solid #000;
+          padding: 8px;
+          text-align: center;
+          font-weight: bold;
+          background: #f8f8f8;
+        }
+        .memo-table td {
+          border: 1px solid #000;
+          padding: 8px;
+          height: 25px;
+          vertical-align: top;
+        }
+        .particulars-col {
+          width: 60%;
+          text-align: left;
+        }
+        .taka-col {
+          width: 20%;
+          text-align: right;
+        }
+        .taka-col input {
+          width: 100%;
+          border: none;
+          background: transparent;
+          text-align: right;
+          font-size: 12px;
+          padding: 0 4px;
+        }
+        .ps-col {
+          width: 20%;
+          text-align: center;
+        }
+        .total-row {
+          font-weight: bold;
+        }
+        .total-row .taka-col {
+          background: #f8f8f8;
+        }
+        .footer-signatures {
+          display: flex;
+          justify-content: space-around;
+          margin-top: 40px;
+          font-size: 12px;
+        }
+        .sig-item {
+          text-align: center;
+        }
+        .sig-line {
+          border-top: 1px solid #000;
+          width: 100px;
+          margin-top: 30px;
+        }
+      </style>
+
+      <div class="voucher-memo">
+        <div class="memo-header">
+          <div class="company-name">ELITE PAINT & CHEMICAL INDUSTRIES LTD.</div>
+          <div class="company-address">
+            Corporate Office: Syed Grand Centre (Level-B & 12), Plot # 89 Road # 28, Sector # 7, Uttara, Dhaka-1230.<br>
+            Khulna Office: 12, Sher-E-Bangla Road, Khulna.
+          </div>
+          <div style="font-weight: bold; margin-top: 5px;">Khulna Depot</div>
+          <div class="voucher-type">DEBIT VOUCHER</div>
+        </div>
+
+        <div class="header-info">
+          <div class="header-field">
+            <div class="field-label">Voucher No.</div>
+            <div class="field-value">${voucher.voucherNo || ''}</div>
+          </div>
+          <div class="header-field">
+            <div class="field-label">Date</div>
+            <div class="field-value">${this.formatVoucherDate(voucher.date)}</div>
+          </div>
+        </div>
+
+        <div class="form-fields">
+          <div class="form-row">
+            <span class="row-label">Code No.</span>
+            <span class="row-value">${voucher.codeNo || ''}</span>
+          </div>
+          <div class="form-row-full">
+            <div class="row-label">Pay to</div>
+            <div class="row-value" style="border-bottom: 1px solid #000;">${voucher.payTo || ''}</div>
+          </div>
+          <div class="form-row">
+            <span class="row-label">Head of Accounts</span>
+            <span class="row-value"></span>
+            <span class="row-label" style="margin-left: 30px;">Control A/C.</span>
+            <span class="row-value">${voucher.controlAc || ''}</span>
+          </div>
+        </div>
+
+        <table class="memo-table">
+          <thead>
+            <tr>
+              <th class="particulars-col">PARTICULARS</th>
+              <th class="taka-col">TAKA</th>
+              <th class="ps-col">PS.</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${particulars.map((part, idx) => `
+              <tr>
+                <td class="particulars-col">${part}</td>
+                <td class="taka-col"><input type="number" step="0.01" /></td>
+                <td class="ps-col"></td>
+              </tr>
+            `).join('')}
+            <tr>
+              <td colspan="3" style="border:none; height:15px;"></td>
+            </tr>
+            <tr>
+              <td colspan="3">
+                <div style="display:flex; gap:20px;">
+                  <div style="flex:1;">
+                    <strong style="font-size:11px;">CASH/CHEQUE/P.O/D.D</strong>
+                    <div style="border-bottom:1px solid #000; height:15px;"></div>
+                  </div>
+                  <div style="flex:1;">
+                    <strong style="font-size:11px;">A/c. No. :</strong>
+                    <div style="border-bottom:1px solid #000; height:15px;">${voucher.accountNo || ''}</div>
+                  </div>
+                  <div style="flex:1;">
+                    <strong style="font-size:11px;">Date :</strong>
+                    <div style="border-bottom:1px solid #000; height:15px;"></div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="3" style="padding:10px; background:#f8f8f8;">
+                <div><strong style="font-size:11px;">Taka (In words) :</strong></div>
+                <div style="font-size:13px; font-weight:bold; margin-top:5px;">${this.numberToBanglaWords(voucher.amount)}</div>
+              </td>
+            </tr>
+            <tr class="total-row">
+              <td colspan="1"></td>
+              <td class="taka-col"><strong>${this.formatAmount(voucher.amount)}</strong></td>
+              <td class="ps-col"></td>
+            </tr>
+            <tr>
+              <td colspan="3" style="border:none; text-align:right; padding-right:20px; font-weight:bold;">Total</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="footer-signatures">
+          <div class="sig-item">
+            <div>Acknowledged by</div>
+            <div class="sig-line"></div>
+          </div>
+          <div class="sig-item">
+            <div>Prepared by</div>
+            <div class="sig-line"></div>
+          </div>
+          <div class="sig-item">
+            <div>Verified by</div>
+            <div class="sig-line"></div>
+          </div>
+          <div class="sig-item">
+            <div>Recommend by</div>
+            <div class="sig-line"></div>
+          </div>
+          <div class="sig-item">
+            <div>Approved by</div>
+            <div class="sig-line"></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = memoHTML;
+  }
+
+  formatVoucherDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${d.getDate()}-${months[d.getMonth()]}-${d.getFullYear()}`;
+  }
+
+  formatAmount(amount) {
+    return parseFloat(amount).toFixed(2);
   }
 
   printVoucher(voucher) {
