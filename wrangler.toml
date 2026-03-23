@@ -1,0 +1,83 @@
+name = "elite-voucher"
+type = "javascript"
+main = "src/index.js"
+compatibility_date = "2024-06-05"
+compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare Pages
+pages_build_output_dir = "public"
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "elite-voucher"
+database_id = "YOUR_DB_ID"
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "KV_SESSIONS"
+id = "YOUR_KV_SESSIONS_ID"
+preview_id = "YOUR_KV_SESSIONS_PREVIEW_ID"
+
+[[kv_namespaces]]
+binding = "KV_SETTINGS"
+id = "YOUR_KV_SETTINGS_ID"
+preview_id = "YOUR_KV_SETTINGS_PREVIEW_ID"
+
+[[kv_namespaces]]
+binding = "KV_PUBLIC_CACHE"
+id = "YOUR_KV_CACHE_ID"
+preview_id = "YOUR_KV_CACHE_PREVIEW_ID"
+
+# Environment Variables
+[env.production]
+name = "elite-voucher"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "elite-voucher"
+database_id = "YOUR_PROD_DB_ID"
+
+[[env.production.kv_namespaces]]
+binding = "KV_SESSIONS"
+id = "YOUR_PROD_KV_SESSIONS_ID"
+
+[[env.production.kv_namespaces]]
+binding = "KV_SETTINGS"
+id = "YOUR_PROD_KV_SETTINGS_ID"
+
+[[env.production.kv_namespaces]]
+binding = "KV_PUBLIC_CACHE"
+id = "YOUR_PROD_KV_CACHE_ID"
+
+[env.local]
+name = "elite-voucher-local"
+
+[env.local.d1_databases]
+binding = "DB"
+database_name = "elite-voucher"
+
+[env.local.kv_namespaces]
+binding = "KV_SESSIONS"
+id = "local_sessions"
+
+[env.local.kv_namespaces]
+binding = "KV_SETTINGS"
+id = "local_settings"
+
+[env.local.kv_namespaces]
+binding = "KV_PUBLIC_CACHE"
+id = "local_cache"
+
+# Routes (for Cloudflare Workers)
+[[routes]]
+pattern = "https://api.*/api/*"
+zone_name = "example.com"
+
+# Triggers for background jobs
+[triggers.crons]
+crons = ["0 0 * * *"]
+
+# Observability
+[observability]
+logs = { enabled = true }

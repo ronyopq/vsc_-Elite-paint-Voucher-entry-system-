@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>এলিট পেইন্ট ভাউচার এন্ট্রি সিস্টেম</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Noto Serif Bengali', serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .auth-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 50px 40px;
+      max-width: 450px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 36px;
+      margin-bottom: 20px;
+    }
+
+    .auth-container h1 {
+      font-size: 28px;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .auth-container p {
+      color: #666;
+      margin-bottom: 40px;
+      font-size: 16px;
+    }
+
+    .login-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: white;
+      color: #333;
+      border: 2px solid #e0e0e0;
+      padding: 14px 30px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-family: 'Noto Serif Bengali', serif;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .login-btn:hover {
+      border-color: #667eea;
+      color: #667eea;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    }
+
+    .features {
+      margin-top: 40px;
+      text-align: left;
+      border-top: 1px solid #eee;
+      padding-top: 30px;
+    }
+
+    .features h3 {
+      font-size: 18px;
+      color: #333;
+      margin-bottom: 15px;
+    }
+
+    .features ul {
+      list-style: none;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .features li {
+      padding: 8px 0;
+      padding-left: 25px;
+      position: relative;
+    }
+
+    .features li:before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #667eea;
+      font-weight: bold;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error {
+      color: #d32f2f;
+      margin: 20px 0;
+      padding: 12px;
+      background: #ffebee;
+      border-radius: 6px;
+      display: none;
+    }
+
+    .dashboard-container {
+      display: none;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .header {
+      background: white;
+      padding: 20px 30px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .header h1 {
+      color: #333;
+      font-size: 24px;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .user-info span {
+      color: #666;
+    }
+
+    .logout-btn {
+      background: #d32f2f;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: 'Noto Serif Bengali', serif;
+      font-size: 14px;
+    }
+
+    .logout-btn:hover {
+      background: #b71c1c;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #eee;
+      background: white;
+      padding: 15px 30px;
+      border-radius: 8px;
+    }
+
+    .nav-tabs button {
+      background: none;
+      border: none;
+      padding: 10px 20px;
+      font-family: 'Noto Serif Bengali', serif;
+      font-size: 16px;
+      cursor: pointer;
+      color: #999;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s ease;
+    }
+
+    .nav-tabs button.active {
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+
+    .nav-tabs button:hover {
+      color: #667eea;
+    }
+
+    .content {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="error" id="errorMessage"></div>
+
+  <!-- Auth Page -->
+  <div class="auth-container" id="authContainer">
+    <div class="logo">🎫</div>
+    <h1>এলিট পেইন্ট ভাউচার</h1>
+    <p>এন্ট্রি সিস্টেম এবং প্রিন্ট ম্যানেজমেন্ট</p>
+
+    <div class="loading" id="authLoading">
+      <div class="spinner"></div>
+      <p>লিঙ্ক হচ্ছে...</p>
+    </div>
+
+    <button class="login-btn" id="loginBtn" onclick="handleGoogleLogin()">
+      <span>🔐</span>
+      <span>গুগল দিয়ে প্রবেশ করুন</span>
+    </button>
+
+    <div class="features">
+      <h3>বৈশিষ্ট্য:</h3>
+      <ul>
+        <li>সহজ ভাউচার এন্ট্রি</li>
+        <li>নিখুঁত আত্মীয় পরিবর্তন প্রিন্ট</li>
+        <li>স্বয়ংক্রিয় সুপারিশ</li>
+        <li>সপ্তাহিক রিপোর্ট</li>
+        <li>ডিজিটাল শেয়ারিং</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="dashboard-container" id="dashboardContainer">
+    <div class="header">
+      <div>
+        <h1>🎫 এলিট পেইন্ট ভাউচার</h1>
+      </div>
+      <div class="user-info">
+        <span id="userName"></span>
+        <button class="logout-btn" onclick="handleLogout()">লগ আউট</button>
+      </div>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="active" onclick="switchTab('voucher')">নতুন ভাউচার</button>
+      <button onclick="switchTab('history')">ইতিহাস</button>
+      <button onclick="switchTab('reports')">রিপোর্ট</button>
+      <button onclick="switchTab('settings')">সেটিংস</button>
+    </div>
+
+    <div class="content">
+      <!-- Voucher Tab -->
+      <div class="tab-content active" id="voucherTab">
+        <div id="voucherForm"></div>
+        <div id="voucherPreview"></div>
+      </div>
+
+      <!-- History Tab -->
+      <div class="tab-content" id="historyTab">
+        <div id="voucherHistory"></div>
+      </div>
+
+      <!-- Reports Tab -->
+      <div class="tab-content" id="reportsTab">
+        <div id="reports"></div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div class="tab-content" id="settingsTab">
+        <div id="settings"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "elite-paint-voucher-entry-system",
+  "version": "1.0.0",
+  "description": "Cloud-hosted multi-user Bangla voucher slip system",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler migrations apply --local",
+    "db:seed": "node scripts/seed-db.js",
+    "db:reset": "wrangler d1 execute elite-voucher --local --command 'DROP TABLE IF EXISTS users; DROP TABLE IF EXISTS vouchers; DROP TABLE IF EXISTS saved_lists;'",
+    "build": "echo 'No build step required for static frontend'",
+    "admin": "node scripts/admin-cli.js"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.3",
+    "number-to-bangla-text": "^1.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.100.0",
+    "@cloudflare/workers-types": "^4.20240605.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
