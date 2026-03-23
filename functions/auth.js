@@ -84,7 +84,7 @@ export async function handleAuthCallback(request, sessionManager, authHandler, d
     const response = new Response(null, {
       status: 302,
       headers: {
-        Location: `${env.APP_DOMAIN}/`
+        Location: `${env.APP_DOMAIN}/dashboard`
       }
     });
 
