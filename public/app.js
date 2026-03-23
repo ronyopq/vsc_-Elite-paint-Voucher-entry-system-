@@ -118,30 +118,43 @@ class VoucherApp {
         <div class="form-group full-width">
           <label>বিবরণ (বিশেষ তথ্য) *</label>
           <div class="particulars-grid">
-            <input type="text" id="particular1" class="particular-input" placeholder="প্রথম বিবরণ" />
-            <input type="text" id="particular2" class="particular-input" placeholder="দ্বিতীয় বিবরণ" />
-            <input type="text" id="particular3" class="particular-input" placeholder="তৃতীয় বিবরণ" />
-            <input type="text" id="particular4" class="particular-input" placeholder="চতুর্থ বিবরণ" />
-            <input type="text" id="particular5" class="particular-input" placeholder="পঞ্চম বিবরণ" />
+            <div class="particular-row">
+              <input type="text" id="particular1" class="particular-input" placeholder="প্রথম বিবরণ" />
+              <input type="number" id="particularAmount1" class="particular-amount-input" placeholder="টাকা" step="0.01" min="0" />
+            </div>
+            <div class="particular-row">
+              <input type="text" id="particular2" class="particular-input" placeholder="দ্বিতীয় বিবরণ" />
+              <input type="number" id="particularAmount2" class="particular-amount-input" placeholder="টাকা" step="0.01" min="0" />
+            </div>
+            <div class="particular-row">
+              <input type="text" id="particular3" class="particular-input" placeholder="তৃতীয় বিবরণ" />
+              <input type="number" id="particularAmount3" class="particular-amount-input" placeholder="টাকা" step="0.01" min="0" />
+            </div>
+            <div class="particular-row">
+              <input type="text" id="particular4" class="particular-input" placeholder="চতুর্থ বিবরণ" />
+              <input type="number" id="particularAmount4" class="particular-amount-input" placeholder="টাকা" step="0.01" min="0" />
+            </div>
+            <div class="particular-row">
+              <input type="text" id="particular5" class="particular-input" placeholder="পঞ্চম বিবরণ" />
+              <input type="number" id="particularAmount5" class="particular-amount-input" placeholder="টাকা" step="0.01" min="0" />
+            </div>
           </div>
+          <div class="particular-total-row">
+            <label for="amount">মোট টাকা *</label>
+            <input type="number" id="amount" placeholder="০" step="0.01" required readonly>
+          </div>
+          <div class="amount-words" id="amountWords"></div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label>পরিমাণ (টাকা) *</label>
-            <input type="number" id="amount" placeholder="০" step="0.01" required>
-            <div class="amount-words" id="amountWords"></div>
-          </div>
-          <div class="form-group">
-            <label>পেমেন্ট পদ্ধতি</label>
-            <select id="paymentMethod">
-              <option value="">নির্বাচন করুন</option>
-              <option value="নগদ">নগদ</option>
-              <option value="চেক">চেক</option>
-              <option value="ট্রান্সফার">ব্যাংক ট্রান্সফার</option>
-              <option value="ক্রেডিট কার্ড">ক্রেডিট কার্ড</option>
-            </select>
-          </div>
+        <div class="form-group full-width">
+          <label>পেমেন্ট পদ্ধতি</label>
+          <select id="paymentMethod">
+            <option value="">নির্বাচন করুন</option>
+            <option value="নগদ">নগদ</option>
+            <option value="চেক">চেক</option>
+            <option value="ট্রান্সফার">ব্যাংক ট্রান্সফার</option>
+            <option value="ক্রেডিট কার্ড">ক্রেডিট কার্ড</option>
+          </select>
         </div>
 
         <div class="form-actions">
@@ -165,27 +178,41 @@ class VoucherApp {
       }
     });
 
-    // Setup amount to words conversion
-    document.getElementById('amount').addEventListener('input', (e) => this.updateAmountWords(e.target.value));
+    // Setup particulars amount listeners to auto-calculate total
+    for (let i = 1; i <= 5; i += 1) {
+      const amountInput = document.getElementById(`particularAmount${i}`);
+      if (amountInput) {
+        amountInput.addEventListener('input', () => this.updateParticularsTotal());
+      }
+    }
 
     // Set today's date by default
     this.setToday();
+    this.updateParticularsTotal();
   }
 
   async handleVoucherSubmit(e) {
     e.preventDefault();
 
-    // Collect particulars from 5 fields
-    const particulars = [
-      document.getElementById('particular1').value.trim(),
-      document.getElementById('particular2').value.trim(),
-      document.getElementById('particular3').value.trim(),
-      document.getElementById('particular4').value.trim(),
-      document.getElementById('particular5').value.trim()
-    ].filter(p => p).join(' | ');
+    const rows = [];
+    for (let i = 1; i <= 5; i += 1) {
+      const text = (document.getElementById(`particular${i}`).value || '').trim();
+      const amount = parseFloat(document.getElementById(`particularAmount${i}`).value || '0') || 0;
+      if (text || amount > 0) {
+        rows.push({ text, amount });
+      }
+    }
 
-    if (!particulars) {
+    const particulars = rows.map(row => `${row.text}|||${row.amount}`).join(' || ');
+    const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+
+    if (!rows.length) {
       this.showError('অন্তত একটি বিবরণ প্রয়োজন।');
+      return;
+    }
+
+    if (totalAmount <= 0) {
+      this.showError('অন্তত একটি টাকার পরিমাণ প্রয়োজন।');
       return;
     }
 
@@ -196,7 +223,7 @@ class VoucherApp {
       codeNo: document.getElementById('codeNo').value,
       controlAc: document.getElementById('controlAc').value,
       particulars: particulars,
-      amount: parseFloat(document.getElementById('amount').value),
+      amount: totalAmount,
       accountNo: document.getElementById('accountNo').value,
       paymentMethod: document.getElementById('paymentMethod').value
     };
@@ -314,6 +341,21 @@ class VoucherApp {
     document.getElementById('amountWords').innerHTML = `<em>${words}</em>`;
   }
 
+  updateParticularsTotal() {
+    let total = 0;
+    for (let i = 1; i <= 5; i += 1) {
+      const amount = parseFloat(document.getElementById(`particularAmount${i}`)?.value || '0') || 0;
+      total += amount;
+    }
+
+    const amountInput = document.getElementById('amount');
+    if (amountInput) {
+      amountInput.value = total > 0 ? total.toFixed(2) : '';
+    }
+
+    this.updateAmountWords(total);
+  }
+
   numberToBanglaWords(num) {
     const units = ['', 'এক', 'দুই', 'তিন', 'চার', 'পাঁচ', 'ছয়', 'সাত', 'আট', 'নয়'];
     const tens = ['', '', 'বিশ', 'ত্রিশ', 'চল্লিশ', 'পঞ্চাশ', 'ষাট', 'সত্তর', 'আশি', 'নব্বই'];
@@ -395,13 +437,44 @@ class VoucherApp {
 
   renderVoucher(voucher, containerId) {
     const container = document.getElementById(containerId);
-    const particulars = voucher.particulars.split(' | ').filter(p => p.trim());
-    
-    // Ensure 5 rows
-    while (particulars.length < 5) particulars.push('');
-    particulars.length = 5;
+    container.innerHTML = this.buildVoucherMemoHTML(voucher);
+  }
 
-    const memoHTML = `
+  parseVoucherRows(voucher) {
+    const rawParticulars = (voucher.particulars || '').trim();
+    const rows = [];
+
+    if (rawParticulars.includes('|||')) {
+      const rawRows = rawParticulars.split(' || ');
+      rawRows.forEach((row) => {
+        const [text = '', amountRaw = '0'] = row.split('|||');
+        rows.push({
+          text: text.trim(),
+          amount: parseFloat(amountRaw || '0') || 0
+        });
+      });
+    } else {
+      const legacyRows = rawParticulars.split(' | ').filter(p => p.trim());
+      legacyRows.forEach((text, index) => {
+        rows.push({
+          text: text.trim(),
+          amount: index === 0 ? (parseFloat(voucher.amount) || 0) : 0
+        });
+      });
+    }
+
+    while (rows.length < 5) {
+      rows.push({ text: '', amount: 0 });
+    }
+
+    return rows.slice(0, 5);
+  }
+
+  buildVoucherMemoHTML(voucher) {
+    const rows = this.parseVoucherRows(voucher);
+    const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0) || (parseFloat(voucher.amount) || 0);
+
+    return `
       <style>
         .voucher-memo {
           width: 900px;
@@ -414,9 +487,9 @@ class VoucherApp {
         }
         .memo-header {
           text-align: center;
-          margin-bottom: 20px;
+          margin-bottom: 18px;
           border-bottom: 2px solid #000;
-          padding-bottom: 15px;
+          padding-bottom: 12px;
         }
         .company-name {
           font-weight: bold;
@@ -440,10 +513,10 @@ class VoucherApp {
         .header-info {
           text-align: right;
           font-size: 12px;
-          margin-top: 10px;
+          margin-top: 8px;
         }
         .header-field {
-          margin: 5px 0;
+          margin: 4px 0;
         }
         .field-label {
           font-weight: bold;
@@ -457,17 +530,17 @@ class VoucherApp {
           text-align: center;
         }
         .form-fields {
-          margin: 15px 0;
+          margin: 14px 0;
           font-size: 12px;
         }
         .form-row {
-          margin-bottom: 10px;
+          margin-bottom: 8px;
           display: flex;
           gap: 20px;
           align-items: center;
         }
         .form-row-full {
-          margin-bottom: 10px;
+          margin-bottom: 8px;
         }
         .row-label {
           font-weight: bold;
@@ -481,61 +554,50 @@ class VoucherApp {
         .memo-table {
           width: 100%;
           border-collapse: collapse;
-          margin: 20px 0;
+          margin: 18px 0;
           font-size: 12px;
         }
-        .memo-table th {
+        .memo-table th,
+        .memo-table td {
           border: 1px solid #000;
-          padding: 8px;
+          padding: 7px;
+        }
+        .memo-table th {
           text-align: center;
           font-weight: bold;
           background: #f8f8f8;
         }
-        .memo-table td {
-          border: 1px solid #000;
-          padding: 8px;
-          height: 25px;
-          vertical-align: top;
-        }
         .particulars-col {
           width: 60%;
-          text-align: left;
         }
         .taka-col {
           width: 20%;
           text-align: right;
         }
-        .taka-col input {
-          width: 100%;
-          border: none;
-          background: transparent;
-          text-align: right;
-          font-size: 12px;
-          padding: 0 4px;
-        }
         .ps-col {
           width: 20%;
           text-align: center;
         }
-        .total-row {
+        .total-label {
+          text-align: right;
           font-weight: bold;
         }
-        .total-row .taka-col {
+        .total-amount {
+          font-weight: bold;
           background: #f8f8f8;
         }
         .footer-signatures {
           display: flex;
           justify-content: space-around;
-          margin-top: 40px;
-          font-size: 12px;
+          margin-top: 34px;
         }
         .sig-item {
+          width: 130px;
           text-align: center;
         }
         .sig-line {
           border-top: 1px solid #000;
-          width: 100px;
-          margin-top: 30px;
+          margin-top: 26px;
         }
       </style>
 
@@ -552,29 +614,29 @@ class VoucherApp {
 
         <div class="header-info">
           <div class="header-field">
-            <div class="field-label">Voucher No.</div>
-            <div class="field-value">${voucher.voucherNo || ''}</div>
+            <span class="field-label">Voucher No.</span>
+            <span class="field-value">${this.escapeHtml(voucher.voucherNo || '')}</span>
           </div>
           <div class="header-field">
-            <div class="field-label">Date</div>
-            <div class="field-value">${this.formatVoucherDate(voucher.date)}</div>
+            <span class="field-label">Date</span>
+            <span class="field-value">${this.formatVoucherDate(voucher.date)}</span>
           </div>
         </div>
 
         <div class="form-fields">
           <div class="form-row">
             <span class="row-label">Code No.</span>
-            <span class="row-value">${voucher.codeNo || ''}</span>
+            <span class="row-value">${this.escapeHtml(voucher.codeNo || '')}</span>
           </div>
           <div class="form-row-full">
             <div class="row-label">Pay to</div>
-            <div class="row-value" style="border-bottom: 1px solid #000;">${voucher.payTo || ''}</div>
+            <div class="row-value">${this.escapeHtml(voucher.payTo || '')}</div>
           </div>
           <div class="form-row">
             <span class="row-label">Head of Accounts</span>
             <span class="row-value"></span>
             <span class="row-label" style="margin-left: 30px;">Control A/C.</span>
-            <span class="row-value">${voucher.controlAc || ''}</span>
+            <span class="row-value">${this.escapeHtml(voucher.controlAc || '')}</span>
           </div>
         </div>
 
@@ -587,18 +649,15 @@ class VoucherApp {
             </tr>
           </thead>
           <tbody>
-            ${particulars.map((part, idx) => `
+            ${rows.map((row) => `
               <tr>
-                <td class="particulars-col">${part}</td>
-                <td class="taka-col"><input type="number" step="0.01" /></td>
+                <td class="particulars-col">${this.escapeHtml(row.text)}</td>
+                <td class="taka-col">${row.amount > 0 ? this.formatAmount(row.amount) : ''}</td>
                 <td class="ps-col"></td>
               </tr>
             `).join('')}
             <tr>
-              <td colspan="3" style="border:none; height:15px;"></td>
-            </tr>
-            <tr>
-              <td colspan="3">
+              <td colspan="3" style="padding:7px;">
                 <div style="display:flex; gap:20px;">
                   <div style="flex:1;">
                     <strong style="font-size:11px;">CASH/CHEQUE/P.O/D.D</strong>
@@ -606,7 +665,7 @@ class VoucherApp {
                   </div>
                   <div style="flex:1;">
                     <strong style="font-size:11px;">A/c. No. :</strong>
-                    <div style="border-bottom:1px solid #000; height:15px;">${voucher.accountNo || ''}</div>
+                    <div style="border-bottom:1px solid #000; height:15px;">${this.escapeHtml(voucher.accountNo || '')}</div>
                   </div>
                   <div style="flex:1;">
                     <strong style="font-size:11px;">Date :</strong>
@@ -616,48 +675,28 @@ class VoucherApp {
               </td>
             </tr>
             <tr>
-              <td colspan="3" style="padding:10px; background:#f8f8f8;">
+              <td colspan="3" style="padding:10px;">
                 <div><strong style="font-size:11px;">Taka (In words) :</strong></div>
-                <div style="font-size:13px; font-weight:bold; margin-top:5px;">${this.numberToBanglaWords(voucher.amount)}</div>
+                <div style="font-size:13px; font-weight:bold; margin-top:5px;">${this.numberToBanglaWords(total)}</div>
               </td>
             </tr>
-            <tr class="total-row">
-              <td colspan="1"></td>
-              <td class="taka-col"><strong>${this.formatAmount(voucher.amount)}</strong></td>
-              <td class="ps-col"></td>
-            </tr>
             <tr>
-              <td colspan="3" style="border:none; text-align:right; padding-right:20px; font-weight:bold;">Total</td>
+              <td class="total-label">Total</td>
+              <td class="taka-col total-amount">${this.formatAmount(total)}</td>
+              <td class="ps-col"></td>
             </tr>
           </tbody>
         </table>
 
         <div class="footer-signatures">
-          <div class="sig-item">
-            <div>Acknowledged by</div>
-            <div class="sig-line"></div>
-          </div>
-          <div class="sig-item">
-            <div>Prepared by</div>
-            <div class="sig-line"></div>
-          </div>
-          <div class="sig-item">
-            <div>Verified by</div>
-            <div class="sig-line"></div>
-          </div>
-          <div class="sig-item">
-            <div>Recommend by</div>
-            <div class="sig-line"></div>
-          </div>
-          <div class="sig-item">
-            <div>Approved by</div>
-            <div class="sig-line"></div>
-          </div>
+          <div class="sig-item"><div class="sig-line"></div></div>
+          <div class="sig-item"><div class="sig-line"></div></div>
+          <div class="sig-item"><div class="sig-line"></div></div>
+          <div class="sig-item"><div class="sig-line"></div></div>
+          <div class="sig-item"><div class="sig-line"></div></div>
         </div>
       </div>
     `;
-
-    container.innerHTML = memoHTML;
   }
 
   formatVoucherDate(dateStr) {
@@ -668,7 +707,7 @@ class VoucherApp {
   }
 
   formatAmount(amount) {
-    return parseFloat(amount).toFixed(2);
+    return (parseFloat(amount) || 0).toFixed(2);
   }
 
   printVoucher(voucher) {
@@ -683,7 +722,7 @@ class VoucherApp {
   }
 
   generatePrintHTML(voucher) {
-    // This will generate the exact print layout
+    const memoHTML = this.buildVoucherMemoHTML(voucher);
     return `
 <!DOCTYPE html>
 <html lang="bn">
@@ -691,18 +730,13 @@ class VoucherApp {
   <meta charset="UTF-8">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    @page { size: 8.3in 5.65in; margin: 0; }
-    body { margin: 0; padding: 0; font-family: 'Noto Serif Bengali', serif; }
-    .voucher { width: 8.3in; height: 5.65in; position: relative; padding: 0; }
+    @page { size: A4; margin: 10mm; }
+    body { margin: 0; padding: 0; background: white; }
+    .voucher-memo { box-shadow: none !important; margin: 0 auto !important; }
   </style>
 </head>
 <body>
-  <div class="voucher" id="voucherForPrint"></div>
-  <script src="/voucher-renderer.js"><\/script>
-  <script>
-    const voucher = ${JSON.stringify(voucher)};
-    VoucherRenderer.render(document.getElementById('voucherForPrint'), voucher);
-  <\/script>
+  ${memoHTML}
 </body>
 </html>
     `;
@@ -867,6 +901,7 @@ class VoucherApp {
   clearForm() {
     document.getElementById('voucherEntryForm').reset();
     this.setToday();
+    this.updateParticularsTotal();
   }
 
   switchTab(tabName) {
