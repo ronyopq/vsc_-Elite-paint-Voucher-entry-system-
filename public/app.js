@@ -14,15 +14,8 @@ class VoucherApp {
     // Show OAuth error message if callback returned with an error.
     this.showAuthErrorFromQuery();
 
-    // Check if user is logged in
-    const sessionToken = this.getCookie('session_token');
-    
-    if (!sessionToken) {
-      this.showAuthPage();
-      return;
-    }
-
     try {
+      // Session cookie is HttpOnly, so frontend must validate auth via API.
       const response = await fetch(`${this.apiBase}/auth/user`);
       if (!response.ok) {
         this.showAuthPage();
