@@ -1,5 +1,0 @@
-/api/* https://elite-voucher-api.ronybd.workers.dev/api/:splat 200
-/auth/* https://elite-voucher-api.ronybd.workers.dev/auth/:splat 200
-/v/* https://elite-voucher-api.ronybd.workers.dev/v/:splat 200
-/admin /admin.html 200
-/admin/ /admin.html 200
