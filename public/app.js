@@ -634,7 +634,12 @@ function handleGoogleLogin() {
   loginBtn.style.display = 'none';
   loading.style.display = 'block';
 
-  window.location.href = '/auth/login';
+  const isProdPages = window.location.hostname === 'vcelite.pages.dev';
+  const loginUrl = isProdPages
+    ? 'https://elite-voucher-api.ronybd.workers.dev/auth/login'
+    : '/auth/login';
+
+  window.location.href = loginUrl;
 }
 
 // Handle logout

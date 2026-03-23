@@ -20,7 +20,11 @@ export class AuthHandler {
       redirect_uri: this.redirectUri,
       response_type: 'code',
       scope: 'openid profile email',
-      state: state
+      state: state,
+      prompt: 'select_account consent',
+      include_granted_scopes: 'true',
+      access_type: 'online',
+      hl: 'bn'
     });
 
     return `${GOOGLE_OAUTH_URL}?${params.toString()}`;
