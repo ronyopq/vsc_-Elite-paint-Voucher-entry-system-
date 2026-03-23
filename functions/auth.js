@@ -30,20 +30,45 @@ export async function handleAuthCallback(request, sessionManager, authHandler, d
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
+  const oauthError = url.searchParams.get('error');
+  const oauthErrorDescription = url.searchParams.get('error_description');
+
+  if (oauthError) {
+    const redirectUrl = new URL(env.APP_DOMAIN);
+    redirectUrl.searchParams.set('auth_error', oauthError);
+    if (oauthErrorDescription) {
+      redirectUrl.searchParams.set('auth_error_description', oauthErrorDescription);
+    }
+
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: redirectUrl.toString()
+      }
+    });
+  }
 
   if (!code || !state) {
-    return new Response(JSON.stringify({ error: 'Missing code or state' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
+    const redirectUrl = new URL(env.APP_DOMAIN);
+    redirectUrl.searchParams.set('auth_error', 'missing_code_or_state');
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: redirectUrl.toString()
+      }
     });
   }
 
   // Verify state
   const stateExists = await sessionManager.kv.get(`oauth_state:${state}`);
   if (!stateExists) {
-    return new Response(JSON.stringify({ error: 'Invalid state' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' }
+    const redirectUrl = new URL(env.APP_DOMAIN);
+    redirectUrl.searchParams.set('auth_error', 'invalid_state');
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: redirectUrl.toString()
+      }
     });
   }
 
@@ -92,9 +117,14 @@ export async function handleAuthCallback(request, sessionManager, authHandler, d
 
   } catch (error) {
     console.error('Auth callback error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
+    const redirectUrl = new URL(env.APP_DOMAIN);
+    redirectUrl.searchParams.set('auth_error', 'oauth_callback_failed');
+    redirectUrl.searchParams.set('auth_error_description', error.message || 'Authentication failed');
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: redirectUrl.toString()
+      }
     });
   }
 }

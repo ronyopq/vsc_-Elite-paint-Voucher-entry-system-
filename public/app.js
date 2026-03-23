@@ -11,6 +11,9 @@ class VoucherApp {
   }
 
   async init() {
+    // Show OAuth error message if callback returned with an error.
+    this.showAuthErrorFromQuery();
+
     // Check if user is logged in
     const sessionToken = this.getCookie('session_token');
     
@@ -33,6 +36,31 @@ class VoucherApp {
       console.error('Auth check error:', error);
       this.showAuthPage();
     }
+  }
+
+  showAuthErrorFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('auth_error');
+    const description = params.get('auth_error_description');
+
+    if (!code) return;
+
+    const messages = {
+      access_denied: 'আপনি Google লগইন অনুমতি দেননি। আবার চেষ্টা করুন।',
+      invalid_state: 'লগইন সেশন মেয়াদ শেষ হয়েছে। আবার লগইন করুন।',
+      missing_code_or_state: 'Google লগইন সম্পন্ন হয়নি। আবার চেষ্টা করুন।',
+      oauth_callback_failed: 'Google লগইন যাচাই করা যায়নি। আবার চেষ্টা করুন।'
+    };
+
+    const fallback = 'লগইন করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।';
+    const extra = description ? `\nবিস্তারিত: ${description}` : '';
+    this.showError((messages[code] || fallback) + extra);
+
+    // Clean query params so refresh does not repeat the same error state.
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('auth_error');
+    cleanUrl.searchParams.delete('auth_error_description');
+    window.history.replaceState({}, '', cleanUrl.toString());
   }
 
   showAuthPage() {
