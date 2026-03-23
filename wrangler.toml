@@ -10,7 +10,6 @@ enabled = true
 ENVIRONMENT = "production"
 APP_DOMAIN = "https://vcelite.pages.dev"
 GOOGLE_REDIRECT_URI = "https://vcelite.pages.dev/auth/callback"
-SUPER_ADMIN_EMAILS = "rony.opq@gmail.com"
 
 [[d1_databases]]
 binding = "DB"
