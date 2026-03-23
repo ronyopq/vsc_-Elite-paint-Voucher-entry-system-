@@ -136,9 +136,6 @@ const VoucherRenderer = {
     // QR Code
     this.addQRCode(canvas, voucher.public_id || voucher.publicId);
 
-    // Signature row labels
-    this.addSignatureLabels(canvas);
-
     return canvas;
   },
 
@@ -225,8 +222,7 @@ const VoucherRenderer = {
       overflow: hidden;
     `;
 
-    // Generate QR code using qrcode.js library
-    // If qrcode library is available, use it; otherwise show URL
+    // Generate QR code using qrcode.js library or an image API fallback.
     const url = `${window.location.origin}/v/${publicId}`;
 
     if (typeof QRCode !== 'undefined') {
@@ -248,8 +244,16 @@ const VoucherRenderer = {
         qrContainer.appendChild(qrImage);
       }
     } else {
-      // Fallback: show URL text
-      qrContainer.innerHTML = `<div style="font-size: 9px; word-break: break-all;">${publicId}</div>`;
+      const img = document.createElement('img');
+      img.alt = 'Voucher QR';
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.src = `https://api.qrserver.com/v1/create-qr-code/?size=${field.size}x${field.size}&data=${encodeURIComponent(url)}`;
+      img.onerror = () => {
+        qrContainer.innerHTML = `<div style="font-size: 9px; word-break: break-all;">${publicId}</div>`;
+      };
+      qrContainer.innerHTML = '';
+      qrContainer.appendChild(img);
     }
 
     canvas.appendChild(qrContainer);

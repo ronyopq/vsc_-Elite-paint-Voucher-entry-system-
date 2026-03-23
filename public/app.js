@@ -473,17 +473,26 @@ class VoucherApp {
   buildVoucherMemoHTML(voucher) {
     const rows = this.parseVoucherRows(voucher);
     const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0) || (parseFloat(voucher.amount) || 0);
+    const publicId = voucher.publicId || voucher.public_id || '';
+    const shareUrl = publicId ? `${window.location.origin}/v/${publicId}` : '';
+    const qrUrl = shareUrl
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=95x95&data=${encodeURIComponent(shareUrl)}`
+      : '';
 
     return `
       <style>
         .voucher-memo {
           width: 900px;
           background: white;
+          background-image: url('/voucher-template.jpg');
+          background-size: 100% 100%;
+          background-repeat: no-repeat;
           font-family: Arial, sans-serif;
           padding: 30px;
           margin: 20px auto;
           box-shadow: 0 0 10px rgba(0,0,0,0.1);
           color: #000;
+          position: relative;
         }
         .memo-header {
           text-align: center;
@@ -514,6 +523,7 @@ class VoucherApp {
           text-align: right;
           font-size: 12px;
           margin-top: 8px;
+          margin-right: 110px;
         }
         .header-field {
           margin: 4px 0;
@@ -528,6 +538,29 @@ class VoucherApp {
           display: inline-block;
           width: 150px;
           text-align: center;
+        }
+        .memo-qr {
+          position: absolute;
+          right: 30px;
+          top: 32px;
+          width: 95px;
+          height: 95px;
+          border: 1px solid #000;
+          background: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+        .memo-qr img {
+          width: 100%;
+          height: 100%;
+        }
+        .memo-qr-fallback {
+          font-size: 10px;
+          text-align: center;
+          padding: 4px;
+          word-break: break-all;
         }
         .form-fields {
           margin: 14px 0;
@@ -602,6 +635,12 @@ class VoucherApp {
       </style>
 
       <div class="voucher-memo">
+        <div class="memo-qr">
+          ${qrUrl
+            ? `<img src="${qrUrl}" alt="Voucher QR" onerror="this.parentElement.innerHTML='<div class=\"memo-qr-fallback\">${this.escapeHtml(publicId || 'QR')}</div>'">`
+            : `<div class="memo-qr-fallback">${this.escapeHtml(publicId || 'QR')}</div>`}
+        </div>
+
         <div class="memo-header">
           <div class="company-name">ELITE PAINT & CHEMICAL INDUSTRIES LTD.</div>
           <div class="company-address">
@@ -848,10 +887,14 @@ class VoucherApp {
 
       const data = await response.json();
       const vouchers = data.vouchers || [];
+      const totalAmount = vouchers.reduce((sum, v) => {
+        const raw = v.amount ?? v.amount_value ?? 0;
+        return sum + (parseFloat(raw) || 0);
+      }, 0);
 
       return {
         total: vouchers.length,
-        total_amount: vouchers.reduce((sum, v) => sum + (v.amount || 0), 0)
+        total_amount: totalAmount
       };
     } catch (error) {
       console.error('Get stats error:', error);
@@ -904,12 +947,19 @@ class VoucherApp {
     this.updateParticularsTotal();
   }
 
-  switchTab(tabName) {
+  switchTab(tabName, clickedButton = null) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.nav-tabs button').forEach(btn => btn.classList.remove('active'));
 
-    document.getElementById(tabName + 'Tab').classList.add('active');
-    event.target.classList.add('active');
+    const content = document.getElementById(tabName + 'Tab');
+    if (content) {
+      content.classList.add('active');
+    }
+
+    const button = clickedButton || document.querySelector(`.nav-tabs button[onclick*="'${tabName}'"]`);
+    if (button) {
+      button.classList.add('active');
+    }
   }
 
   showError(message) {
@@ -1041,3 +1091,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+function switchTab(tabName) {
+  if (window.app) {
+    window.app.switchTab(tabName);
+  }
+}
