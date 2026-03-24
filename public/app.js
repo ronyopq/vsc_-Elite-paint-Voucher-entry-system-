@@ -8,6 +8,7 @@ class VoucherApp {
     this.voucherHistory = [];
     this.apiBase = '';
     this.historyFilter = '';
+    this.editingVoucherId = null;
     this.historyAdvanced = {
       status: '',
       dateFrom: '',
@@ -469,7 +470,8 @@ class VoucherApp {
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="btn-primary">সংরক্ষণ ও প্রিন্ট</button>
+          <button type="submit" id="saveVoucherBtn" class="btn-primary">সংরক্ষণ ও প্রিন্ট</button>
+          <button type="button" id="cancelEditBtn" class="btn-secondary hidden-inline" onclick="app.cancelEditMode()">এডিট বাতিল</button>
           <button type="button" class="btn-secondary" onclick="app.clearForm()">পরিষ্কার</button>
         </div>
       </form>
@@ -724,8 +726,13 @@ class VoucherApp {
     };
 
     try {
-      const response = await fetch(`${this.apiBase}/api/voucher/create`, {
-        method: 'POST',
+      const isEditMode = !!this.editingVoucherId;
+      const endpoint = isEditMode
+        ? `${this.apiBase}/api/voucher/update/${this.editingVoucherId}`
+        : `${this.apiBase}/api/voucher/create`;
+
+      const response = await fetch(endpoint, {
+        method: isEditMode ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(voucherData)
       });
@@ -750,12 +757,109 @@ class VoucherApp {
         }
       }, 500);
 
+      if (isEditMode) {
+        this.showMessage('ভাউচার আপডেট হয়েছে');
+        this.cancelEditMode();
+      } else {
+        this.showMessage('ভাউচার সংরক্ষণ হয়েছে');
+      }
+
       // Reload history
       this.loadVoucherHistory();
 
     } catch (error) {
       console.error('Submit error:', error);
       this.showError('একটি ত্রুটি ঘটেছে। আবার চেষ্টা করুন।');
+    }
+  }
+
+  async editVoucher(id) {
+    try {
+      const response = await fetch(`${this.apiBase}/api/voucher/${id}`);
+      const data = await response.json();
+
+      if (!response.ok || !data.voucher) {
+        this.showError(data.error || 'ভাউচার লোড করা যায়নি');
+        return;
+      }
+
+      this.switchTab('voucher');
+      this.fillFormFromVoucher(data.voucher);
+      this.editingVoucherId = id;
+
+      const saveBtn = document.getElementById('saveVoucherBtn');
+      const cancelBtn = document.getElementById('cancelEditBtn');
+      if (saveBtn) saveBtn.textContent = 'আপডেট ও প্রিন্ট';
+      if (cancelBtn) cancelBtn.classList.remove('hidden-inline');
+
+      this.showMessage('এডিট মোড চালু হয়েছে');
+    } catch (error) {
+      console.error('Edit voucher load error:', error);
+      this.showError('এডিট মোড চালু করা যায়নি');
+    }
+  }
+
+  fillFormFromVoucher(voucher) {
+    const rows = this.parseVoucherRows(voucher);
+    const setValue = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.value = value || '';
+    };
+
+    setValue('date', voucher.date || '');
+    setValue('voucherNo', voucher.voucher_no || voucher.voucherNo || '');
+    setValue('payTo', voucher.pay_to || voucher.payTo || '');
+    setValue('codeNo', voucher.code_no || voucher.codeNo || '');
+    setValue('controlAc', voucher.control_ac || voucher.controlAc || '');
+    setValue('accountNo', voucher.account_no || voucher.accountNo || '');
+    setValue('paymentMethod', voucher.payment_method || voucher.paymentMethod || '');
+
+    for (let i = 1; i <= 5; i += 1) {
+      setValue(`particular${i}`, rows[i - 1]?.text || '');
+      setValue(`particularAmount${i}`, rows[i - 1]?.amount ? String(rows[i - 1].amount) : '');
+    }
+
+    this.updateParticularsTotal();
+  }
+
+  cancelEditMode() {
+    this.editingVoucherId = null;
+    const saveBtn = document.getElementById('saveVoucherBtn');
+    const cancelBtn = document.getElementById('cancelEditBtn');
+    if (saveBtn) saveBtn.textContent = 'সংরক্ষণ ও প্রিন্ট';
+    if (cancelBtn) cancelBtn.classList.add('hidden-inline');
+    this.clearForm();
+  }
+
+  async viewAuditTrail(voucherId) {
+    try {
+      const response = await fetch(`${this.apiBase}/api/voucher/audit/${voucherId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        this.showError(data.error || 'Audit trail লোড ব্যর্থ');
+        return;
+      }
+
+      const logs = data.logs || [];
+      const rows = logs.length
+        ? logs.map((log) => `<tr><td>${new Date(log.created_at).toLocaleString('bn-BD')}</td><td>${this.escapeHtml(log.action || '')}</td><td>${this.escapeHtml(log.details || '')}</td></tr>`).join('')
+        : '<tr><td colspan="3">কোনো audit log নেই</td></tr>';
+
+      const html = `
+        <h3>Audit Trail</h3>
+        <table class="history-table">
+          <thead><tr><th>সময়</th><th>অ্যাকশন</th><th>বিস্তারিত</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+
+      const preview = document.getElementById('voucherPreview');
+      if (preview) preview.innerHTML = html;
+      this.switchTab('voucher');
+    } catch (error) {
+      console.error('Audit trail load error:', error);
+      this.showError('Audit trail দেখানো যায়নি');
     }
   }
 
@@ -1512,6 +1616,7 @@ class VoucherApp {
         <input type="number" min="0" step="0.01" placeholder="সর্বনিম্ন টাকা" value="${this.escapeHtml(String(this.historyAdvanced.amountMin || ''))}" onchange="app.setHistoryAdvancedFilter('amountMin', this.value)">
         <input type="number" min="0" step="0.01" placeholder="সর্বোচ্চ টাকা" value="${this.escapeHtml(String(this.historyAdvanced.amountMax || ''))}" onchange="app.setHistoryAdvancedFilter('amountMax', this.value)">
         <button class="btn-secondary" onclick="app.clearHistoryFilters()">ফিল্টার রিসেট</button>
+        <button class="btn-secondary" onclick="app.exportVouchersExcel()">Excel Export</button>
         <button class="btn-secondary" onclick="app.exportVouchersCSV()">CSV Export</button>
         <button class="btn-secondary" onclick="app.exportVouchersJSON()">JSON Export</button>
       </div>
@@ -1537,6 +1642,8 @@ class VoucherApp {
               <td><span class="status-badge ${this.getWorkflowStatus(v).className}">${this.getWorkflowStatus(v).label}</span></td>
               <td>
                 <button onclick="app.viewVoucher('${v.id}')" class="btn-small">দেখুন</button>
+                <button onclick="app.editVoucher('${v.id}')" class="btn-small">এডিট</button>
+                <button onclick="app.viewAuditTrail('${v.id}')" class="btn-small">Audit</button>
                 ${settings.publicUrl.enabled && settings.publicUrl.showShareButtons ? `<button onclick="app.shareVoucher('${v.public_id}')" class="btn-small">শেয়ার</button>` : ''}
                 ${settings.publicUrl.enabled && settings.publicUrl.showVerifyLink ? `<button onclick="app.copyVerifyLink('${v.public_id}')" class="btn-small">Verify Link</button>` : ''}
                 ${this.renderWorkflowActionButtons(v)}
@@ -1569,6 +1676,33 @@ class VoucherApp {
       <div class="report-section">
         <h3>ব্যাংক রিকনসিলিয়েশন</h3>
         <div id="bankReconciliation"></div>
+      </div>
+      <div class="report-section">
+        <h3>Custom Report Builder</h3>
+        <div class="history-toolbar">
+          <input type="date" id="reportFromDate">
+          <input type="date" id="reportToDate">
+          <select id="reportStatus">
+            <option value="">সব স্ট্যাটাস</option>
+            <option value="draft">ড্রাফট</option>
+            <option value="prepared">প্রস্তুত</option>
+            <option value="verified">যাচাইকৃত</option>
+            <option value="recommended">সুপারিশকৃত</option>
+            <option value="approved">অনুমোদিত</option>
+          </select>
+          <input type="text" id="reportPayee" placeholder="Payee name">
+          <button class="btn-primary" onclick="app.generateCustomReport()">রিপোর্ট তৈরি</button>
+          <button class="btn-secondary" onclick="app.exportCustomReportExcel()">Excel Download</button>
+        </div>
+        <div id="customReportOutput"></div>
+      </div>
+      <div class="report-section">
+        <h3>Role-wise Approval Queue</h3>
+        <div id="approvalQueue"></div>
+      </div>
+      <div class="report-section">
+        <h3>Email Notification Workflow Log</h3>
+        <div id="emailNotificationLog"></div>
       </div>
     `;
 
@@ -1619,6 +1753,9 @@ class VoucherApp {
         : '<p>কোন ডাটা নেই</p>';
 
       document.getElementById('bankReconciliation').innerHTML = this.renderBankReconciliation();
+      await this.loadApprovalQueueDashboard();
+      await this.loadEmailNotificationLog();
+      this.generateCustomReport();
     } catch (error) {
       console.error('Load reports error:', error);
     }
@@ -1967,6 +2104,140 @@ class VoucherApp {
       .slice(0, 5);
   }
 
+  filterCustomReportRows() {
+    const fromDate = document.getElementById('reportFromDate')?.value || '';
+    const toDate = document.getElementById('reportToDate')?.value || '';
+    const status = document.getElementById('reportStatus')?.value || '';
+    const payee = (document.getElementById('reportPayee')?.value || '').trim().toLowerCase();
+
+    return this.voucherHistory.filter((v) => {
+      const vDate = String(v.date || '');
+      const vStatus = this.getWorkflowStatus(v).className;
+      const vPayee = String(v.pay_to || '').toLowerCase();
+
+      if (fromDate && vDate < fromDate) return false;
+      if (toDate && vDate > toDate) return false;
+      if (status && vStatus !== status) return false;
+      if (payee && !vPayee.includes(payee)) return false;
+      return true;
+    });
+  }
+
+  generateCustomReport() {
+    const rows = this.filterCustomReportRows();
+    const total = rows.reduce((sum, v) => sum + (parseFloat(v.amount) || 0), 0);
+
+    const html = `
+      <p><strong>মোট ফলাফল:</strong> ${rows.length} টি | <strong>মোট পরিমাণ:</strong> ${this.formatAmount(total)} টাকা</p>
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>তারিখ</th>
+            <th>ভাউচার</th>
+            <th>পে-টু</th>
+            <th>টাকা</th>
+            <th>স্ট্যাটাস</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((v) => `
+            <tr>
+              <td>${this.escapeHtml(v.date || '')}</td>
+              <td>${this.escapeHtml(v.voucher_no || '')}</td>
+              <td>${this.escapeHtml(v.pay_to || '')}</td>
+              <td>${this.formatAmount(v.amount)}</td>
+              <td>${this.getWorkflowStatus(v).label}</td>
+            </tr>
+          `).join('') || '<tr><td colspan="5">কোনো ডাটা নেই</td></tr>'}
+        </tbody>
+      </table>
+    `;
+
+    const out = document.getElementById('customReportOutput');
+    if (out) out.innerHTML = html;
+  }
+
+  exportCustomReportExcel() {
+    const rows = this.filterCustomReportRows();
+    const headers = ['date', 'voucher_no', 'pay_to', 'amount', 'status'];
+    const lines = [headers.join('\t')];
+
+    rows.forEach((v) => {
+      const row = [
+        v.date || '',
+        v.voucher_no || '',
+        v.pay_to || '',
+        String(v.amount || ''),
+        this.getWorkflowStatus(v).label
+      ].map((cell) => String(cell).replace(/[\t\n\r]/g, ' '));
+      lines.push(row.join('\t'));
+    });
+
+    this.downloadTextFile(`custom-report-${new Date().toISOString().slice(0, 10)}.xls`, lines.join('\n'), 'application/vnd.ms-excel;charset=utf-8');
+  }
+
+  async loadApprovalQueueDashboard() {
+    try {
+      const response = await fetch(`${this.apiBase}/api/voucher/approval-queue`);
+      const data = await response.json();
+      if (!response.ok) {
+        document.getElementById('approvalQueue').innerHTML = `<p>${this.escapeHtml(data.error || 'Queue load failed')}</p>`;
+        return;
+      }
+
+      const rows = (data.queue || []).map((v) => `
+        <tr>
+          <td>${this.escapeHtml(v.voucher_no || '')}</td>
+          <td>${this.escapeHtml(v.pay_to || '')}</td>
+          <td>${this.formatAmount(v.amount)}</td>
+          <td>${this.escapeHtml(v.nextStage || '')}</td>
+          <td><button class="btn-small" onclick="app.updateVoucherWorkflow('${v.id}', '${v.nextStage}')">প্রসেস</button></td>
+        </tr>
+      `).join('');
+
+      document.getElementById('approvalQueue').innerHTML = `
+        <p>Role: ${this.escapeHtml(data.role || '')} | Pending: ${data.total || 0}</p>
+        <table class="history-table">
+          <thead><tr><th>ভাউচার</th><th>পে-টু</th><th>টাকা</th><th>Next Stage</th><th>Action</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="5">Queue empty</td></tr>'}</tbody>
+        </table>
+      `;
+    } catch (error) {
+      console.error('Approval queue load error:', error);
+      document.getElementById('approvalQueue').innerHTML = '<p>Queue load failed</p>';
+    }
+  }
+
+  async loadEmailNotificationLog() {
+    try {
+      const response = await fetch(`${this.apiBase}/api/voucher/notifications`);
+      const data = await response.json();
+      if (!response.ok) {
+        document.getElementById('emailNotificationLog').innerHTML = `<p>${this.escapeHtml(data.error || 'Notification log load failed')}</p>`;
+        return;
+      }
+
+      const rows = (data.notifications || []).map((n) => `
+        <tr>
+          <td>${new Date(n.created_at).toLocaleString('bn-BD')}</td>
+          <td>${this.escapeHtml(n.action || '')}</td>
+          <td>${this.escapeHtml(n.entity_id || '')}</td>
+          <td>${this.escapeHtml((n.details || '').slice(0, 120))}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('emailNotificationLog').innerHTML = `
+        <table class="history-table">
+          <thead><tr><th>সময়</th><th>অ্যাকশন</th><th>Voucher ID</th><th>Details</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="4">কোনো নোটিফিকেশন নেই</td></tr>'}</tbody>
+        </table>
+      `;
+    } catch (error) {
+      console.error('Notification log load error:', error);
+      document.getElementById('emailNotificationLog').innerHTML = '<p>Notification log load failed</p>';
+    }
+  }
+
   getWorkflowStatus(voucher) {
     if (voucher.approved_by) return { label: 'অনুমোদিত', className: 'approved' };
     if (voucher.recommended_by) return { label: 'সুপারিশকৃত', className: 'recommended' };
@@ -2154,6 +2425,18 @@ class VoucherApp {
     });
 
     this.downloadTextFile(`vouchers-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'), 'text/csv;charset=utf-8');
+  }
+
+  exportVouchersExcel() {
+    const headers = ['date', 'voucher_no', 'pay_to', 'control_ac', 'amount', 'prepared_by', 'verified_by', 'recommended_by', 'approved_by'];
+    const lines = [headers.join('\t')];
+
+    this.voucherHistory.forEach((v) => {
+      const row = headers.map((key) => String(v[key] ?? '').replace(/[\t\n\r]/g, ' '));
+      lines.push(row.join('\t'));
+    });
+
+    this.downloadTextFile(`vouchers-${new Date().toISOString().slice(0, 10)}.xls`, lines.join('\n'), 'application/vnd.ms-excel;charset=utf-8');
   }
 
   exportVouchersJSON() {

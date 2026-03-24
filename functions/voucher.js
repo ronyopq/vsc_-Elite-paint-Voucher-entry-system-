@@ -4,6 +4,31 @@ import Database from '../shared/db.js';
 import { requireAuth } from '../shared/auth.js';
 import { generateId, generatePublicId, convertNumberToBangla, getLocalDateString, hashToken } from '../shared/utils.js';
 
+async function queueWorkflowEmailNotification(env, payload) {
+  const now = new Date().toISOString();
+  const body = {
+    event: 'voucher_workflow_notification',
+    sentAt: now,
+    ...payload
+  };
+
+  if (!env || !env.EMAIL_WEBHOOK_URL) {
+    return { queued: true, via: 'audit_only' };
+  }
+
+  try {
+    const response = await fetch(env.EMAIL_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    return { queued: response.ok, via: 'webhook', status: response.status };
+  } catch {
+    return { queued: false, via: 'webhook' };
+  }
+}
+
 // Create voucher
 export async function handleVoucherCreate(request, db, sessionManager) {
   const [session, authError] = await requireAuth(request, sessionManager);
@@ -47,6 +72,22 @@ export async function handleVoucherCreate(request, db, sessionManager) {
     };
 
     await db.createVoucher(voucherData);
+
+    const createNotifyPayload = {
+      voucherId,
+      voucherNo: data.voucherNo,
+      stage: 'created',
+      actor: session.name || session.email || 'System',
+      nextRole: 'admin'
+    };
+    const createNotifyResult = await queueWorkflowEmailNotification(null, createNotifyPayload);
+    await db.logAction(
+      session.userId,
+      'email_notification_queued',
+      'voucher',
+      voucherId,
+      JSON.stringify({ ...createNotifyPayload, notifyResult: createNotifyResult })
+    );
 
     // Add to saved lists
     if (data.payTo) await db.addToSavedList(session.userId, 'payto', data.payTo);
@@ -150,7 +191,7 @@ export async function handleVoucherGetAll(request, db, sessionManager) {
 }
 
 // Update workflow stage for a voucher
-export async function handleVoucherWorkflowUpdate(request, db, sessionManager, voucherId) {
+export async function handleVoucherWorkflowUpdate(request, db, sessionManager, voucherId, env) {
   const [session, authError] = await requireAuth(request, sessionManager);
 
   if (authError) {
@@ -243,15 +284,220 @@ export async function handleVoucherWorkflowUpdate(request, db, sessionManager, v
       JSON.stringify({ stage, actor })
     );
 
+    const nextRoleByStage = {
+      prepared: 'admin',
+      verified: 'admin',
+      recommended: 'super_admin',
+      approved: 'completed'
+    };
+
+    const notificationPayload = {
+      voucherId,
+      voucherNo: voucher.voucher_no,
+      stage,
+      actor,
+      nextRole: nextRoleByStage[stage] || 'admin'
+    };
+
+    const notifyResult = await queueWorkflowEmailNotification(env, notificationPayload);
+    await db.logAction(
+      session.userId,
+      'email_notification_queued',
+      'voucher',
+      voucherId,
+      JSON.stringify({ ...notificationPayload, notifyResult })
+    );
+
     return new Response(JSON.stringify({
       success: true,
-      voucher: updatedVoucher
+      voucher: updatedVoucher,
+      notification: notifyResult
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
     console.error('Voucher workflow update error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+export async function handleVoucherUpdate(request, db, sessionManager, voucherId) {
+  const [session, authError] = await requireAuth(request, sessionManager);
+
+  if (authError) {
+    return authError;
+  }
+
+  try {
+    const voucher = await db.getVoucher(voucherId);
+    if (!voucher) {
+      return new Response(JSON.stringify({ error: 'Voucher not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (voucher.user_id !== session.userId && session.role !== 'admin' && session.role !== 'super_admin') {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const data = await request.json();
+    const allowedFields = ['date', 'voucherNo', 'payTo', 'codeNo', 'controlAc', 'particulars', 'amount', 'accountNo', 'paymentMethod'];
+    const updates = {};
+
+    allowedFields.forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(data, field)) {
+        updates[field] = data[field];
+      }
+    });
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'amount')) {
+      updates.amount = parseFloat(updates.amount) || 0;
+      updates.amountWords = convertNumberToBangla(updates.amount);
+    }
+
+    if (!Object.keys(updates).length) {
+      return new Response(JSON.stringify({ error: 'No update fields provided' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    await db.updateVoucher(voucherId, updates);
+    const updatedVoucher = await db.getVoucher(voucherId);
+
+    await db.logAction(
+      session.userId,
+      'voucher_updated',
+      'voucher',
+      voucherId,
+      JSON.stringify({ before: voucher, changes: updates })
+    );
+
+    return new Response(JSON.stringify({ success: true, voucher: updatedVoucher }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Voucher update error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+export async function handleVoucherAuditTrail(request, db, sessionManager, voucherId) {
+  const [session, authError] = await requireAuth(request, sessionManager);
+
+  if (authError) {
+    return authError;
+  }
+
+  try {
+    const voucher = await db.getVoucher(voucherId);
+    if (!voucher) {
+      return new Response(JSON.stringify({ error: 'Voucher not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (voucher.user_id !== session.userId && session.role !== 'admin' && session.role !== 'super_admin') {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const logs = await db.getAuditLogsByEntity('voucher', voucherId, 200);
+
+    return new Response(JSON.stringify({
+      voucherId,
+      logs: logs.results || []
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Voucher audit trail error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+export async function handleApprovalQueue(request, db, sessionManager) {
+  const [session, authError] = await requireAuth(request, sessionManager);
+
+  if (authError) {
+    return authError;
+  }
+
+  try {
+    const role = session.role || 'user';
+    const vouchersRaw = (role === 'user')
+      ? await db.getUserVouchers(session.userId, 500, 0)
+      : await db.getAllVouchers(1000, 0);
+    const vouchers = vouchersRaw.results || [];
+    let queue = [];
+
+    if (role === 'user') {
+      queue = vouchers
+        .filter((v) => !v.prepared_by)
+        .map((v) => ({ ...v, nextStage: 'prepared' }));
+    } else if (role === 'admin') {
+      queue = vouchers
+        .filter((v) => (v.prepared_by && !v.verified_by) || (v.verified_by && !v.recommended_by))
+        .map((v) => ({ ...v, nextStage: v.verified_by ? 'recommended' : 'verified' }));
+    } else {
+      queue = vouchers
+        .filter((v) => v.recommended_by && !v.approved_by)
+        .map((v) => ({ ...v, nextStage: 'approved' }));
+    }
+
+    return new Response(JSON.stringify({
+      role,
+      total: queue.length,
+      queue
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Approval queue error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+export async function handleEmailNotifications(request, db, sessionManager) {
+  const [session, authError] = await requireAuth(request, sessionManager);
+
+  if (authError) {
+    return authError;
+  }
+
+  try {
+    const logsRaw = await db.getAuditLogsByActionPrefix('email_notification_', 200);
+    return new Response(JSON.stringify({
+      notifications: logsRaw.results || []
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Email notification fetch error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

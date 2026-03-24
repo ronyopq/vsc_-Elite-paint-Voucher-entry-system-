@@ -115,6 +115,16 @@ export class Database {
     return stmt.all();
   }
 
+  async getAllVouchers(limit = 500, offset = 0) {
+    const stmt = await this.db.prepare(`
+      SELECT * FROM vouchers
+      ORDER BY created_at DESC
+      LIMIT ?1 OFFSET ?2
+    `).bind(limit, offset);
+
+    return stmt.all();
+  }
+
   async updateVoucher(id, updates) {
     const fields = [];
     const values = [];
@@ -221,6 +231,28 @@ export class Database {
       ORDER BY created_at DESC
       LIMIT ?1 OFFSET ?2
     `).bind(limit, offset);
+
+    return stmt.all();
+  }
+
+  async getAuditLogsByEntity(entityType, entityId, limit = 100) {
+    const stmt = await this.db.prepare(`
+      SELECT * FROM audit_logs
+      WHERE entity_type = ?1 AND entity_id = ?2
+      ORDER BY created_at DESC
+      LIMIT ?3
+    `).bind(entityType, entityId, limit);
+
+    return stmt.all();
+  }
+
+  async getAuditLogsByActionPrefix(actionPrefix, limit = 100) {
+    const stmt = await this.db.prepare(`
+      SELECT * FROM audit_logs
+      WHERE action LIKE ?1
+      ORDER BY created_at DESC
+      LIMIT ?2
+    `).bind(`${actionPrefix}%`, limit);
 
     return stmt.all();
   }

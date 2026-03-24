@@ -581,6 +581,10 @@ h3 {
   border: 1px solid #bde6cb;
 }
 
+.hidden-inline {
+  display: none !important;
+}
+
 /* Animated Notification Modal */
 .notification-modal {
   position: fixed;
