@@ -480,7 +480,8 @@ class VoucherApp {
     return rows.slice(0, 5);
   }
 
-  buildVoucherMemoHTML(voucher) {
+  buildVoucherMemoHTML(voucher, options = {}) {
+    const forPrint = options.forPrint === true;
     const rows = this.parseVoucherRows(voucher);
     const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0) || (parseFloat(voucher.amount) || 0);
     const publicId = voucher.publicId || voucher.public_id || '';
@@ -494,17 +495,20 @@ class VoucherApp {
       <style>
         .voucher-memo {
           width: 8.3in;
-          min-height: 5.65in;
+          height: 5.65in;
           background: white;
           background-image: url('/voucher-template.jpg');
           background-size: 100% 100%;
           background-repeat: no-repeat;
           font-family: Arial, sans-serif;
           padding: 24px 28px;
-          margin: 20px auto;
-          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+          margin: ${forPrint ? '0' : '20px auto'};
+          box-shadow: ${forPrint ? 'none' : '0 0 10px rgba(0,0,0,0.1)'};
           color: #000;
           position: relative;
+          overflow: hidden;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
         .memo-header {
           text-align: center;
@@ -668,7 +672,7 @@ class VoucherApp {
       <div class="voucher-memo">
         <div class="memo-qr">
           ${qrUrl
-            ? `<img src="${qrUrl}" alt="Voucher QR" onerror="this.parentElement.innerHTML='<div class=\"memo-qr-fallback\">${this.escapeHtml(publicId || 'QR')}</div>'">`
+            ? `<img src="${qrUrl}" alt="Voucher QR">`
             : `<div class="memo-qr-fallback">${this.escapeHtml(publicId || 'QR')}</div>`}
         </div>
 
@@ -814,7 +818,7 @@ class VoucherApp {
   }
 
   generatePrintHTML(voucher) {
-    const memoHTML = this.buildVoucherMemoHTML(voucher);
+    const memoHTML = this.buildVoucherMemoHTML(voucher, { forPrint: true });
     return `
 <!DOCTYPE html>
 <html lang="bn">
@@ -823,7 +827,8 @@ class VoucherApp {
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;700&display=swap" rel="stylesheet">
   <style>
     @page { size: 8.3in 5.65in; margin: 0; }
-    html, body { margin: 0; padding: 0; background: white; }
+    * { box-sizing: border-box; }
+    html, body { width: 8.3in; height: 5.65in; margin: 0; padding: 0; background: white; overflow: hidden; }
     body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     .voucher-memo { box-shadow: none !important; margin: 0 !important; }
   </style>
