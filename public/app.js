@@ -74,7 +74,132 @@ class VoucherApp {
     this.loadSettings();
   }
 
+  getUserSettings() {
+    const defaults = {
+      depotName: 'Khulna Depot',
+      voucherNo: {
+        mode: 'auto',
+        format: 'VOC-{YYYY}{MM}-{####}',
+        start: 1,
+        sequential: true
+      },
+      code: {
+        mode: 'manual',
+        format: 'CODE-{####}',
+        start: 1,
+        sequential: true
+      },
+      headOfAccounts: {
+        inputType: 'dropdown',
+        options: ['Office Expense', 'Depot Expense', 'Transport Expense'],
+        defaultValue: ''
+      },
+      controlAccount: {
+        mode: 'manual',
+        defaultValue: '',
+        options: ['Cash', 'Bank', 'Petty Cash']
+      },
+      qr: {
+        enabled: true,
+        size: 95,
+        x: 0,
+        y: 0
+      },
+      officers: {
+        show: false,
+        acknowledged: '',
+        prepared: '',
+        verified: '',
+        recommended: '',
+        approved: ''
+      },
+      publicUrl: {
+        enabled: true,
+        showShareButtons: true,
+        showVerifyLink: true,
+        showQr: true
+      }
+    };
+
+    try {
+      const stored = JSON.parse(localStorage.getItem('userConfigSettings') || '{}');
+      return {
+        ...defaults,
+        ...stored,
+        voucherNo: { ...defaults.voucherNo, ...(stored.voucherNo || {}) },
+        code: { ...defaults.code, ...(stored.code || {}) },
+        headOfAccounts: { ...defaults.headOfAccounts, ...(stored.headOfAccounts || {}) },
+        controlAccount: { ...defaults.controlAccount, ...(stored.controlAccount || {}) },
+        qr: { ...defaults.qr, ...(stored.qr || {}) },
+        officers: { ...defaults.officers, ...(stored.officers || {}) },
+        publicUrl: { ...defaults.publicUrl, ...(stored.publicUrl || {}) }
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  saveUserSettings(settings) {
+    localStorage.setItem('userConfigSettings', JSON.stringify(settings));
+  }
+
+  formatSerialByPattern(pattern, serial, dateObj = new Date()) {
+    const y = String(dateObj.getFullYear());
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const serial4 = String(serial).padStart(4, '0');
+    const serial3 = String(serial).padStart(3, '0');
+    const serial2 = String(serial).padStart(2, '0');
+
+    return String(pattern || '{####}')
+      .replaceAll('{YYYY}', y)
+      .replaceAll('{MM}', mm)
+      .replaceAll('{DD}', dd)
+      .replaceAll('{####}', serial4)
+      .replaceAll('{###}', serial3)
+      .replaceAll('{##}', serial2)
+      .replaceAll('{#}', String(serial));
+  }
+
+  getNextSerialValue(typeKey) {
+    const settings = this.getUserSettings();
+    const cfg = typeKey === 'voucher' ? settings.voucherNo : settings.code;
+    const start = parseInt(cfg.start, 10) || 1;
+
+    if (!cfg.sequential) {
+      return start;
+    }
+
+    const formattedList = this.voucherHistory
+      .map((v) => typeKey === 'voucher' ? (v.voucher_no || '') : (v.code_no || ''))
+      .filter(Boolean);
+
+    let maxFound = start - 1;
+    formattedList.forEach((value) => {
+      const digits = String(value).match(/(\d+)(?!.*\d)/);
+      if (!digits) return;
+      const serial = parseInt(digits[1], 10);
+      if (!Number.isNaN(serial) && serial > maxFound) {
+        maxFound = serial;
+      }
+    });
+
+    return maxFound + 1;
+  }
+
   initVoucherForm() {
+    const userSettings = this.getUserSettings();
+    const headOptions = (userSettings.headOfAccounts.options || []).map(opt => `<option value="${this.escapeHtml(opt)}"></option>`).join('');
+    const controlOptions = (userSettings.controlAccount.options || []).map(opt => `<option value="${this.escapeHtml(opt)}"></option>`).join('');
+
+    const headField = userSettings.headOfAccounts.inputType === 'dropdown'
+      ? `<select id="headOfAccounts">${(userSettings.headOfAccounts.options || []).map(opt => `<option value="${this.escapeHtml(opt)}">${this.escapeHtml(opt)}</option>`).join('')}</select>`
+      : `<input type="text" id="headOfAccounts" placeholder="হেড অফ একাউন্টস" list="headOfAccountsList"><datalist id="headOfAccountsList">${headOptions}</datalist>`;
+
+    const controlField = userSettings.controlAccount.mode === 'auto'
+      ? `<input type="text" id="controlAc" placeholder="অ্যাকাউন্ট" required readonly list="controlAcList"><datalist id="controlAcList">${controlOptions}</datalist>`
+      : `<input type="text" id="controlAc" placeholder="অ্যাকাউন্ট" required list="controlAcList"><datalist id="controlAcList">${controlOptions}</datalist>`;
+
     const formHTML = `
       <h2>নতুন ভাউচার এন্ট্রি</h2>
       <form id="voucherEntryForm">
@@ -89,7 +214,7 @@ class VoucherApp {
         <div class="form-row">
           <div class="form-group">
             <label>ভাউচার নম্বর *</label>
-            <input type="text" id="voucherNo" placeholder="উদা: VOC-001" required>
+            <input type="text" id="voucherNo" placeholder="উদা: VOC-001" required ${userSettings.voucherNo.mode === 'auto' ? 'readonly' : ''}>
             <button type="button" class="auto-btn" onclick="app.autoIncrementVoucher()">স্বয়ংক্রিয়</button>
           </div>
           <div class="form-group">
@@ -107,20 +232,31 @@ class VoucherApp {
           </div>
           <div class="form-group">
             <label>কোড নম্বর</label>
-            <input type="text" id="codeNo" placeholder="কোড">
+            <input type="text" id="codeNo" placeholder="কোড" ${userSettings.code.mode === 'auto' ? 'readonly' : ''}>
             <ul class="suggestions" id="codeNoSuggestions"></ul>
           </div>
         </div>
 
         <div class="form-row">
           <div class="form-group">
+            <label>হেড অফ একাউন্টস</label>
+            ${headField}
+          </div>
+          <div class="form-group">
             <label>নিয়ন্ত্রণ অ্যাকাউন্ট *</label>
-            <input type="text" id="controlAc" placeholder="অ্যাকাউন্ট" required>
+            ${controlField}
             <ul class="suggestions" id="controlAcSuggestions"></ul>
           </div>
+        </div>
+
+        <div class="form-row">
           <div class="form-group">
             <label>অ্যাকাউন্ট নম্বর</label>
             <input type="text" id="accountNo" placeholder="অ্যাকাউন্ট নম্বর">
+          </div>
+          <div class="form-group">
+            <label>ডিপোর নাম</label>
+            <input type="text" id="depotName" placeholder="ডিপোর নাম" value="${this.escapeHtml(userSettings.depotName || '')}">
           </div>
         </div>
 
@@ -182,7 +318,7 @@ class VoucherApp {
     // Setup auto-suggestions
     ['payTo', 'codeNo', 'controlAc'].forEach(field => {
       const input = document.getElementById(field);
-      if (input) {
+      if (input && input.tagName === 'INPUT') {
         input.addEventListener('input', (e) => this.getSuggestions(field, e.target.value));
       }
     });
@@ -199,10 +335,32 @@ class VoucherApp {
     this.setToday();
     this.updateParticularsTotal();
     this.renderTemplateOptions();
+
+    if (userSettings.voucherNo.mode === 'auto') {
+      this.autoIncrementVoucher();
+    }
+
+    if (userSettings.code.mode === 'auto') {
+      const serial = this.getNextSerialValue('code');
+      document.getElementById('codeNo').value = this.formatSerialByPattern(userSettings.code.format, serial, new Date());
+    }
+
+    if (userSettings.controlAccount.mode === 'auto') {
+      const controlInput = document.getElementById('controlAc');
+      if (controlInput) {
+        controlInput.value = userSettings.controlAccount.defaultValue || '';
+      }
+    }
+
+    const headInput = document.getElementById('headOfAccounts');
+    if (headInput && userSettings.headOfAccounts.defaultValue) {
+      headInput.value = userSettings.headOfAccounts.defaultValue;
+    }
   }
 
   async handleVoucherSubmit(e) {
     e.preventDefault();
+    const userSettings = this.getUserSettings();
 
     const rows = [];
     for (let i = 1; i <= 5; i += 1) {
@@ -279,6 +437,8 @@ class VoucherApp {
       }
 
       const result = await response.json();
+      result.voucher.headOfAccounts = document.getElementById('headOfAccounts')?.value || userSettings.headOfAccounts.defaultValue || '';
+      result.voucher.depotName = document.getElementById('depotName')?.value || userSettings.depotName || '';
       this.currentVoucher = result.voucher;
 
       // Show preview
@@ -467,12 +627,13 @@ class VoucherApp {
   }
 
   showVoucherPreview(voucher) {
+    const settings = this.getUserSettings();
     const previewHTML = `
       <div class="voucher-preview">
         <div class="preview-header">
           <h3>প্রিভিউ</h3>
           <button type="button" class="btn-primary" onclick="app.printVoucher(${JSON.stringify(voucher).replace(/"/g, '&quot;')})">প্রিন্ট করুন</button>
-          <button type="button" class="btn-secondary" onclick="app.copyLink('${voucher.publicId}')">লিঙ্ক কপি</button>
+          ${settings.publicUrl.enabled && settings.publicUrl.showShareButtons ? `<button type="button" class="btn-secondary" onclick="app.copyLink('${voucher.publicId}')">লিঙ্ক কপি</button>` : ''}
         </div>
         <div id="voucherCanvas"></div>
       </div>
@@ -519,6 +680,7 @@ class VoucherApp {
 
   buildVoucherMemoHTML(voucher, options = {}) {
     const forPrint = options.forPrint === true;
+    const userSettings = this.getUserSettings();
     const rows = this.parseVoucherRows(voucher);
     const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0) || (parseFloat(voucher.amount) || 0);
     const publicId = voucher.publicId || voucher.public_id || '';
@@ -526,6 +688,10 @@ class VoucherApp {
     const qrUrl = shareUrl
       ? `https://api.qrserver.com/v1/create-qr-code/?size=95x95&data=${encodeURIComponent(shareUrl)}`
       : '';
+    const qrEnabled = userSettings.publicUrl.enabled && userSettings.publicUrl.showQr && userSettings.qr.enabled;
+    const qrSize = Number(userSettings.qr.size) || 95;
+    const qrX = Number(userSettings.qr.x) || 0;
+    const qrY = Number(userSettings.qr.y) || 0;
     const dateParts = this.getDateParts(voucher.date);
 
     return `
@@ -613,10 +779,10 @@ class VoucherApp {
         }
         .memo-qr {
           position: absolute;
-          right: 30px;
-          top: 32px;
-          width: 95px;
-          height: 95px;
+          right: ${30 - qrX}px;
+          top: ${32 + qrY}px;
+          width: ${qrSize}px;
+          height: ${qrSize}px;
           border: 1px solid #000;
           background: #fff;
           display: flex;
@@ -707,11 +873,11 @@ class VoucherApp {
       </style>
 
       <div class="voucher-memo">
-        <div class="memo-qr">
+        ${qrEnabled ? `<div class="memo-qr">
           ${qrUrl
             ? `<img src="${qrUrl}" alt="Voucher QR">`
             : `<div class="memo-qr-fallback">${this.escapeHtml(publicId || 'QR')}</div>`}
-        </div>
+        </div>` : ''}
 
         <div class="memo-header">
           <div class="company-name">ELITE PAINT & CHEMICAL INDUSTRIES LTD.</div>
@@ -719,7 +885,7 @@ class VoucherApp {
             Corporate Office: Syed Grand Centre (Level-B & 12), Plot # 89 Road # 28, Sector # 7, Uttara, Dhaka-1230.<br>
             Khulna Office: 12, Sher-E-Bangla Road, Khulna.
           </div>
-          <div style="font-weight: bold; margin-top: 5px;">Khulna Depot</div>
+          <div style="font-weight: bold; margin-top: 5px;">${this.escapeHtml(voucher.depotName || userSettings.depotName || 'Khulna Depot')}</div>
           <div class="voucher-type">DEBIT VOUCHER</div>
         </div>
 
@@ -749,7 +915,7 @@ class VoucherApp {
           </div>
           <div class="form-row">
             <span class="row-label">Head of Accounts</span>
-            <span class="row-value"></span>
+            <span class="row-value">${this.escapeHtml(voucher.headOfAccounts || userSettings.headOfAccounts.defaultValue || '')}</span>
             <span class="row-label" style="margin-left: 30px;">Control A/C.</span>
             <span class="row-value">${this.escapeHtml(voucher.controlAc || '')}</span>
           </div>
@@ -848,6 +1014,7 @@ class VoucherApp {
     const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0) || (parseFloat(voucher.amount) || 0);
     const dateParts = this.getDateParts(voucher.date);
     const calibration = this.getPrintCalibrationSettings();
+    const userSettings = this.getUserSettings();
 
     const baseTopRows = [7.11, 7.76, 8.41, 9.06, 9.71];
     const calibratedTopRows = baseTopRows.map((top, idx) => (top + calibration.offsetYCm + (calibration.lineGapCm * idx)).toFixed(2));
@@ -888,6 +1055,14 @@ class VoucherApp {
 
         <div class="pf pf-words">${this.numberToBanglaWords(total)}</div>
         <div class="pf pf-total">${this.formatAmount(total)}</div>
+
+        ${userSettings.officers.show ? `
+          <div class="pf pf-officer o1">${this.escapeHtml(userSettings.officers.acknowledged || '')}</div>
+          <div class="pf pf-officer o2">${this.escapeHtml(userSettings.officers.prepared || '')}</div>
+          <div class="pf pf-officer o3">${this.escapeHtml(userSettings.officers.verified || '')}</div>
+          <div class="pf pf-officer o4">${this.escapeHtml(userSettings.officers.recommended || '')}</div>
+          <div class="pf pf-officer o5">${this.escapeHtml(userSettings.officers.approved || '')}</div>
+        ` : ''}
       </div>
     `;
   }
@@ -959,6 +1134,13 @@ class VoucherApp {
 
     .pf-words { left: 1.1cm; top: 11.32cm; width: 14.45cm; white-space: normal; line-height: 1.1; }
     .pf-total { left: 15.65cm; top: 11.99cm; width: 3.95cm; text-align: right; font-weight: 700; }
+
+    .pf-officer { width: 3.7cm; text-align: center; font-size: 10px; }
+    .o1 { left: 0.65cm; top: 13.9cm; }
+    .o2 { left: 4.7cm; top: 13.9cm; }
+    .o3 { left: 8.7cm; top: 13.9cm; }
+    .o4 { left: 12.7cm; top: 13.9cm; }
+    .o5 { left: 16.7cm; top: 13.9cm; }
   </style>
 </head>
 <body>
@@ -982,6 +1164,7 @@ class VoucherApp {
   }
 
   displayVoucherHistory() {
+    const settings = this.getUserSettings();
     const query = this.historyFilter.trim().toLowerCase();
     const filteredVouchers = this.voucherHistory.filter((v) => {
       if (!query) return true;
@@ -1017,8 +1200,8 @@ class VoucherApp {
               <td><span class="status-badge ${this.getWorkflowStatus(v).className}">${this.getWorkflowStatus(v).label}</span></td>
               <td>
                 <button onclick="app.viewVoucher('${v.id}')" class="btn-small">দেখুন</button>
-                <button onclick="app.shareVoucher('${v.public_id}')" class="btn-small">শেয়ার</button>
-                <button onclick="app.copyVerifyLink('${v.public_id}')" class="btn-small">Verify Link</button>
+                ${settings.publicUrl.enabled && settings.publicUrl.showShareButtons ? `<button onclick="app.shareVoucher('${v.public_id}')" class="btn-small">শেয়ার</button>` : ''}
+                ${settings.publicUrl.enabled && settings.publicUrl.showVerifyLink ? `<button onclick="app.copyVerifyLink('${v.public_id}')" class="btn-small">Verify Link</button>` : ''}
                 ${this.renderWorkflowActionButtons(v)}
               </td>
             </tr>
@@ -1073,6 +1256,7 @@ class VoucherApp {
   }
 
   async loadSettings() {
+    const userSettings = this.getUserSettings();
     document.getElementById('settings').innerHTML = `
       <h2>সেটিংস</h2>
       <div class="settings-section">
@@ -1081,6 +1265,153 @@ class VoucherApp {
         <p>ইমেইল: ${this.user.email}</p>
         <p>ভূমিকা: ${this.user.role}</p>
       </div>
+      <div class="settings-section">
+        <h3>ভাউচার নাম্বার সেটিংস</h3>
+        <div class="calibration-grid">
+          <label>Mode
+            <select id="setVoucherMode">
+              <option value="auto" ${userSettings.voucherNo.mode === 'auto' ? 'selected' : ''}>Auto</option>
+              <option value="manual" ${userSettings.voucherNo.mode === 'manual' ? 'selected' : ''}>Manual</option>
+            </select>
+          </label>
+          <label>Format
+            <input type="text" id="setVoucherFormat" value="${this.escapeHtml(userSettings.voucherNo.format)}">
+          </label>
+          <label>Start Number
+            <input type="number" id="setVoucherStart" min="1" value="${userSettings.voucherNo.start}">
+          </label>
+          <label>Sequential
+            <select id="setVoucherSequential">
+              <option value="yes" ${userSettings.voucherNo.sequential ? 'selected' : ''}>Yes</option>
+              <option value="no" ${!userSettings.voucherNo.sequential ? 'selected' : ''}>No</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>কোড সেটিংস</h3>
+        <div class="calibration-grid">
+          <label>Mode
+            <select id="setCodeMode">
+              <option value="auto" ${userSettings.code.mode === 'auto' ? 'selected' : ''}>Auto</option>
+              <option value="manual" ${userSettings.code.mode === 'manual' ? 'selected' : ''}>Manual</option>
+            </select>
+          </label>
+          <label>Format
+            <input type="text" id="setCodeFormat" value="${this.escapeHtml(userSettings.code.format)}">
+          </label>
+          <label>Start Number
+            <input type="number" id="setCodeStart" min="1" value="${userSettings.code.start}">
+          </label>
+          <label>Sequential
+            <select id="setCodeSequential">
+              <option value="yes" ${userSettings.code.sequential ? 'selected' : ''}>Yes</option>
+              <option value="no" ${!userSettings.code.sequential ? 'selected' : ''}>No</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>ডিপো ও অ্যাকাউন্ট সেটিংস</h3>
+        <div class="calibration-grid">
+          <label>ডিপোর নাম
+            <input type="text" id="setDepotName" value="${this.escapeHtml(userSettings.depotName || '')}">
+          </label>
+          <label>Head of Accounts Input
+            <select id="setHeadInputType">
+              <option value="dropdown" ${userSettings.headOfAccounts.inputType === 'dropdown' ? 'selected' : ''}>Dropdown</option>
+              <option value="manual" ${userSettings.headOfAccounts.inputType === 'manual' ? 'selected' : ''}>Manual</option>
+            </select>
+          </label>
+          <label>Head of Accounts List (comma)
+            <input type="text" id="setHeadOptions" value="${this.escapeHtml((userSettings.headOfAccounts.options || []).join(', '))}">
+          </label>
+          <label>Head Default
+            <input type="text" id="setHeadDefault" value="${this.escapeHtml(userSettings.headOfAccounts.defaultValue || '')}">
+          </label>
+          <label>Control A/C Mode
+            <select id="setControlMode">
+              <option value="auto" ${userSettings.controlAccount.mode === 'auto' ? 'selected' : ''}>Auto</option>
+              <option value="manual" ${userSettings.controlAccount.mode === 'manual' ? 'selected' : ''}>Manual</option>
+            </select>
+          </label>
+          <label>Control A/C Default
+            <input type="text" id="setControlDefault" value="${this.escapeHtml(userSettings.controlAccount.defaultValue || '')}">
+          </label>
+          <label>Control A/C List (comma)
+            <input type="text" id="setControlOptions" value="${this.escapeHtml((userSettings.controlAccount.options || []).join(', '))}">
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>QR ও Public URL সেটিংস</h3>
+        <div class="calibration-grid">
+          <label>QR Show
+            <select id="setQrEnabled">
+              <option value="yes" ${userSettings.qr.enabled ? 'selected' : ''}>Yes</option>
+              <option value="no" ${!userSettings.qr.enabled ? 'selected' : ''}>No</option>
+            </select>
+          </label>
+          <label>QR Size (px)
+            <input type="number" id="setQrSize" min="40" max="180" value="${userSettings.qr.size}">
+          </label>
+          <label>QR X Offset (px)
+            <input type="number" id="setQrX" value="${userSettings.qr.x}">
+          </label>
+          <label>QR Y Offset (px)
+            <input type="number" id="setQrY" value="${userSettings.qr.y}">
+          </label>
+          <label>Public URL Enable
+            <select id="setPublicUrlEnabled">
+              <option value="yes" ${userSettings.publicUrl.enabled ? 'selected' : ''}>Yes</option>
+              <option value="no" ${!userSettings.publicUrl.enabled ? 'selected' : ''}>No</option>
+            </select>
+          </label>
+          <label>Share Buttons Show
+            <select id="setPublicShareShow">
+              <option value="yes" ${userSettings.publicUrl.showShareButtons ? 'selected' : ''}>Yes</option>
+              <option value="no" ${!userSettings.publicUrl.showShareButtons ? 'selected' : ''}>No</option>
+            </select>
+          </label>
+          <label>Verify Link Show
+            <select id="setPublicVerifyShow">
+              <option value="yes" ${userSettings.publicUrl.showVerifyLink ? 'selected' : ''}>Yes</option>
+              <option value="no" ${!userSettings.publicUrl.showVerifyLink ? 'selected' : ''}>No</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>কর্মকর্তার নাম ও শো অপশন</h3>
+        <div class="calibration-grid">
+          <label>Show Names
+            <select id="setOfficerShow">
+              <option value="yes" ${userSettings.officers.show ? 'selected' : ''}>Yes</option>
+              <option value="no" ${!userSettings.officers.show ? 'selected' : ''}>No</option>
+            </select>
+          </label>
+          <label>Acknowledged by
+            <input type="text" id="setOfficerAcknowledged" value="${this.escapeHtml(userSettings.officers.acknowledged || '')}">
+          </label>
+          <label>Prepared by
+            <input type="text" id="setOfficerPrepared" value="${this.escapeHtml(userSettings.officers.prepared || '')}">
+          </label>
+          <label>Verified by
+            <input type="text" id="setOfficerVerified" value="${this.escapeHtml(userSettings.officers.verified || '')}">
+          </label>
+          <label>Recommended by
+            <input type="text" id="setOfficerRecommended" value="${this.escapeHtml(userSettings.officers.recommended || '')}">
+          </label>
+          <label>Approved by
+            <input type="text" id="setOfficerApproved" value="${this.escapeHtml(userSettings.officers.approved || '')}">
+          </label>
+        </div>
+      </div>
+
       <div class="settings-section">
         <h3>প্রিন্ট ক্যালিব্রেশন</h3>
         <div class="calibration-grid">
@@ -1114,6 +1445,10 @@ class VoucherApp {
         </div>
       </div>
       <div class="settings-section" id="trialInfo"></div>
+      <div class="form-actions">
+        <button class="btn-primary" onclick="app.saveAdvancedUserSettings()">সব সেটিংস সেভ</button>
+        <button class="btn-secondary" onclick="app.resetAdvancedUserSettings()">ডিফল্ট রিসেট</button>
+      </div>
     `;
 
     this.populatePrintCalibration();
@@ -1510,6 +1845,60 @@ class VoucherApp {
     this.showMessage('টেমপ্লেট সংরক্ষণ হয়েছে');
   }
 
+  saveAdvancedUserSettings() {
+    const settings = this.getUserSettings();
+
+    settings.voucherNo.mode = document.getElementById('setVoucherMode')?.value || settings.voucherNo.mode;
+    settings.voucherNo.format = document.getElementById('setVoucherFormat')?.value || settings.voucherNo.format;
+    settings.voucherNo.start = parseInt(document.getElementById('setVoucherStart')?.value || String(settings.voucherNo.start), 10) || settings.voucherNo.start;
+    settings.voucherNo.sequential = (document.getElementById('setVoucherSequential')?.value || 'yes') === 'yes';
+
+    settings.code.mode = document.getElementById('setCodeMode')?.value || settings.code.mode;
+    settings.code.format = document.getElementById('setCodeFormat')?.value || settings.code.format;
+    settings.code.start = parseInt(document.getElementById('setCodeStart')?.value || String(settings.code.start), 10) || settings.code.start;
+    settings.code.sequential = (document.getElementById('setCodeSequential')?.value || 'yes') === 'yes';
+
+    settings.depotName = document.getElementById('setDepotName')?.value || settings.depotName;
+
+    settings.headOfAccounts.inputType = document.getElementById('setHeadInputType')?.value || settings.headOfAccounts.inputType;
+    settings.headOfAccounts.options = String(document.getElementById('setHeadOptions')?.value || '')
+      .split(',').map(s => s.trim()).filter(Boolean);
+    settings.headOfAccounts.defaultValue = document.getElementById('setHeadDefault')?.value || '';
+
+    settings.controlAccount.mode = document.getElementById('setControlMode')?.value || settings.controlAccount.mode;
+    settings.controlAccount.defaultValue = document.getElementById('setControlDefault')?.value || '';
+    settings.controlAccount.options = String(document.getElementById('setControlOptions')?.value || '')
+      .split(',').map(s => s.trim()).filter(Boolean);
+
+    settings.qr.enabled = (document.getElementById('setQrEnabled')?.value || 'yes') === 'yes';
+    settings.qr.size = parseInt(document.getElementById('setQrSize')?.value || String(settings.qr.size), 10) || settings.qr.size;
+    settings.qr.x = parseInt(document.getElementById('setQrX')?.value || String(settings.qr.x), 10) || 0;
+    settings.qr.y = parseInt(document.getElementById('setQrY')?.value || String(settings.qr.y), 10) || 0;
+
+    settings.publicUrl.enabled = (document.getElementById('setPublicUrlEnabled')?.value || 'yes') === 'yes';
+    settings.publicUrl.showShareButtons = (document.getElementById('setPublicShareShow')?.value || 'yes') === 'yes';
+    settings.publicUrl.showVerifyLink = (document.getElementById('setPublicVerifyShow')?.value || 'yes') === 'yes';
+
+    settings.officers.show = (document.getElementById('setOfficerShow')?.value || 'no') === 'yes';
+    settings.officers.acknowledged = document.getElementById('setOfficerAcknowledged')?.value || '';
+    settings.officers.prepared = document.getElementById('setOfficerPrepared')?.value || '';
+    settings.officers.verified = document.getElementById('setOfficerVerified')?.value || '';
+    settings.officers.recommended = document.getElementById('setOfficerRecommended')?.value || '';
+    settings.officers.approved = document.getElementById('setOfficerApproved')?.value || '';
+
+    this.saveUserSettings(settings);
+    this.showMessage('ইউজার সেটিংস সংরক্ষণ হয়েছে');
+    this.initVoucherForm();
+    this.loadVoucherHistory();
+  }
+
+  resetAdvancedUserSettings() {
+    localStorage.removeItem('userConfigSettings');
+    this.showMessage('ইউজার সেটিংস ডিফল্টে রিসেট হয়েছে');
+    this.loadSettings();
+    this.initVoucherForm();
+  }
+
   applySelectedTemplate() {
     const select = document.getElementById('voucherTemplateSelect');
     if (!select || !select.value) return;
@@ -1537,29 +1926,10 @@ class VoucherApp {
   }
 
   autoIncrementVoucher() {
-    // Format: VOC-YYYYMM-###
-    if (this.voucherHistory.length > 0) {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const prefix = `VOC-${y}${m}-`;
-
-      const monthVouchers = this.voucherHistory.filter(v => String(v.voucher_no || '').startsWith(prefix));
-      let maxSerial = 0;
-      monthVouchers.forEach((v) => {
-        const serial = parseInt(String(v.voucher_no).replace(prefix, ''), 10);
-        if (serial > maxSerial) maxSerial = serial;
-      });
-
-      const nextNum = String(maxSerial + 1).padStart(3, '0');
-      document.getElementById('voucherNo').value = `${prefix}${nextNum}`;
-      return;
-    }
-
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    document.getElementById('voucherNo').value = `VOC-${y}${m}-001`;
+    const settings = this.getUserSettings();
+    const serial = this.getNextSerialValue('voucher');
+    const voucherNo = this.formatSerialByPattern(settings.voucherNo.format, serial, new Date());
+    document.getElementById('voucherNo').value = voucherNo;
   }
 
   setToday() {
