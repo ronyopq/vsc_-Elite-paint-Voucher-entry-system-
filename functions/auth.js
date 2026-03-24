@@ -150,6 +150,15 @@ export async function handleAuthCallback(request, sessionManager, authHandler, d
     // Check if user exists
     let user = await db.getUserByGoogleId(userInfo.googleId);
 
+    // If super admin pre-created user by email, attach google id.
+    if (!user) {
+      const existingByEmail = await db.getUserByEmail(userInfo.email);
+      if (existingByEmail) {
+        await db.linkUserGoogleId(existingByEmail.id, userInfo.googleId);
+        user = await db.getUser(existingByEmail.id);
+      }
+    }
+
     // Create user if not exists
     if (!user) {
       const userId = generateId('user');

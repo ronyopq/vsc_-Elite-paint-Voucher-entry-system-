@@ -168,7 +168,43 @@ class AdminApp {
       return;
     }
 
+    const createBlock = this.user.role === 'super_admin' ? `
+      <div style="margin-bottom: 20px; padding: 16px; border: 1px solid #e0e6ef; border-radius: 8px; background: #f8fbff;">
+        <h3 style="margin-bottom: 12px;">নতুন ব্যবহারকারী তৈরি</h3>
+        <div class="form-group">
+          <label>নাম</label>
+          <input type="text" id="newUserName" placeholder="ব্যবহারকারীর নাম">
+        </div>
+        <div class="form-group">
+          <label>ইমেইল</label>
+          <input type="email" id="newUserEmail" placeholder="user@example.com">
+        </div>
+        <div class="form-group">
+          <label>রোল</label>
+          <select id="newUserRole">
+            <option value="user">user</option>
+            <option value="admin">admin</option>
+            <option value="super_admin">super_admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>ট্রায়াল দিন</label>
+          <input type="number" id="newUserTrialDays" min="1" max="3650" value="30">
+        </div>
+        <div class="form-group">
+          <label>দৈনিক ভাউচার সীমা (0 = আনলিমিটেড)</label>
+          <input type="number" id="newUserDailyLimit" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label>মাসিক ভাউচার সীমা (0 = আনলিমিটেড)</label>
+          <input type="number" id="newUserMonthlyLimit" min="0" value="0">
+        </div>
+        <button class="btn btn-primary" onclick="adminApp.createUser()">ইউজার তৈরি করুন</button>
+      </div>
+    ` : '';
+
     const tableHTML = `
+      ${createBlock}
       <table class="users-table">
         <thead>
           <tr>
@@ -177,6 +213,8 @@ class AdminApp {
             <th>ভূমিকা</th>
             <th>স্থিতি</th>
             <th>মেয়াদ শেষ</th>
+            <th>দৈনিক সীমা</th>
+            <th>মাসিক সীমা</th>
             <th>অ্যাকশন</th>
           </tr>
         </thead>
@@ -197,12 +235,15 @@ class AdminApp {
                   </span>
                 </td>
                 <td>${daysLeft > 0 ? daysLeft + ' দিন' : 'শেষ'}</td>
+                <td>${u.dailyVoucherLimit || 0}</td>
+                <td>${u.monthlyVoucherLimit || 0}</td>
                 <td>
                   <div class="action-buttons">
                     <button class="btn btn-small btn-primary" onclick="adminApp.extendTrial('${u.id}')">সম্প্রসারণ</button>
                     <button class="btn btn-small ${u.is_blocked ? 'btn-success' : 'btn-danger'}" onclick="adminApp.toggleBlock('${u.id}', ${!u.is_blocked})">
                       ${u.is_blocked ? 'আনব্লক' : 'ব্লক'}
                     </button>
+                    ${this.user.role === 'super_admin' ? `<button class="btn btn-small btn-primary" onclick="adminApp.openSetLimitsModal('${u.id}', ${u.dailyVoucherLimit || 0}, ${u.monthlyVoucherLimit || 0})">সীমা</button>` : ''}
                     <button class="btn btn-small btn-primary" onclick="adminApp.loginAsUser('${u.id}')">লগইন</button>
                   </div>
                 </td>
@@ -288,6 +329,58 @@ class AdminApp {
     this.showModal('ট্রায়াল সম্প্রসারণ', html);
   }
 
+  openSetLimitsModal(userId, dailyLimit = 0, monthlyLimit = 0) {
+    this.currentModal = { userId, action: 'set-limits' };
+    const html = `
+      <div class="form-group">
+        <label>দৈনিক ভাউচার সীমা (0 = আনলিমিটেড)</label>
+        <input type="number" id="limitDaily" min="0" value="${dailyLimit}">
+      </div>
+      <div class="form-group">
+        <label>মাসিক ভাউচার সীমা (0 = আনলিমিটেড)</label>
+        <input type="number" id="limitMonthly" min="0" value="${monthlyLimit}">
+      </div>
+    `;
+    this.showModal('ব্যবহার সীমা নির্ধারণ', html);
+  }
+
+  async createUser() {
+    try {
+      const payload = {
+        name: document.getElementById('newUserName')?.value || '',
+        email: document.getElementById('newUserEmail')?.value || '',
+        role: document.getElementById('newUserRole')?.value || 'user',
+        trialDays: parseInt(document.getElementById('newUserTrialDays')?.value || '30', 10),
+        dailyVoucherLimit: parseInt(document.getElementById('newUserDailyLimit')?.value || '0', 10),
+        monthlyVoucherLimit: parseInt(document.getElementById('newUserMonthlyLimit')?.value || '0', 10)
+      };
+
+      if (!payload.name.trim() || !payload.email.trim()) {
+        alert('নাম এবং ইমেইল দিন');
+        return;
+      }
+
+      const response = await fetch(`${this.apiBase}/api/admin/user/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data.error || 'ইউজার তৈরি ব্যর্থ');
+        return;
+      }
+
+      alert('ইউজার তৈরি হয়েছে');
+      await this.loadDashboard();
+      await this.switchSection('users');
+    } catch (error) {
+      console.error('Create user error:', error);
+      alert('ইউজার তৈরি করা যায়নি');
+    }
+  }
+
   async handleModalSubmit() {
     if (this.currentModal.action === 'extend') {
       const days = document.getElementById('extensionDays').value;
@@ -306,6 +399,33 @@ class AdminApp {
         }
       } catch (error) {
         console.error('Extend trial error:', error);
+      }
+    } else if (this.currentModal.action === 'set-limits') {
+      const daily = parseInt(document.getElementById('limitDaily')?.value || '0', 10);
+      const monthly = parseInt(document.getElementById('limitMonthly')?.value || '0', 10);
+
+      try {
+        const response = await fetch(`${this.apiBase}/api/admin/user/set-limits`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: this.currentModal.userId,
+            dailyVoucherLimit: daily,
+            monthlyVoucherLimit: monthly
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          alert(data.error || 'সীমা আপডেট ব্যর্থ');
+          return;
+        }
+
+        await this.loadDashboard();
+        await this.switchSection('users');
+        this.closeModal();
+      } catch (error) {
+        console.error('Set limits error:', error);
       }
     }
   }

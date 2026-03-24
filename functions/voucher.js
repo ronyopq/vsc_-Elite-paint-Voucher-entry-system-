@@ -25,6 +25,27 @@ function isVoucherSoftDeleted(registry, voucherId) {
   return Boolean(registry && registry[voucherId] && registry[voucherId].deletedAt);
 }
 
+async function getUserLimitConfig(db, userId) {
+  try {
+    const raw = await db.getSetting(`user_limits:${userId}`);
+    const parsed = JSON.parse(raw || '{}');
+    return {
+      dailyVoucherLimit: Math.max(0, parseInt(parsed.dailyVoucherLimit || 0, 10) || 0),
+      monthlyVoucherLimit: Math.max(0, parseInt(parsed.monthlyVoucherLimit || 0, 10) || 0)
+    };
+  } catch {
+    return { dailyVoucherLimit: 0, monthlyVoucherLimit: 0 };
+  }
+}
+
+function getTodayDateKey() {
+  return getLocalDateString(new Date());
+}
+
+function getMonthDateKey() {
+  return new Date().toISOString().slice(0, 7);
+}
+
 async function queueWorkflowEmailNotification(env, payload) {
   const now = new Date().toISOString();
   const body = {
@@ -75,6 +96,31 @@ export async function handleVoucherCreate(request, db, sessionManager, env) {
     const voucherId = generateId('voucher');
     const publicId = generatePublicId();
     const amountWords = convertNumberToBangla(parseFloat(data.amount));
+
+    const limitConfig = await getUserLimitConfig(db, session.userId);
+    if (limitConfig.dailyVoucherLimit > 0 || limitConfig.monthlyVoucherLimit > 0) {
+      const userVouchersRaw = await db.getUserVouchers(session.userId, 10000, 0);
+      const userVouchers = userVouchersRaw.results || [];
+      const softDeleteRegistry = await getSoftDeleteRegistry(db);
+      const activeVouchers = userVouchers.filter((v) => !isVoucherSoftDeleted(softDeleteRegistry, v.id));
+
+      const todayCount = activeVouchers.filter((v) => String(v.date || '') === getTodayDateKey()).length;
+      const monthCount = activeVouchers.filter((v) => String(v.date || '').slice(0, 7) === getMonthDateKey()).length;
+
+      if (limitConfig.dailyVoucherLimit > 0 && todayCount >= limitConfig.dailyVoucherLimit) {
+        return new Response(JSON.stringify({ error: `দৈনিক ভাউচার সীমা শেষ (${limitConfig.dailyVoucherLimit})` }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (limitConfig.monthlyVoucherLimit > 0 && monthCount >= limitConfig.monthlyVoucherLimit) {
+        return new Response(JSON.stringify({ error: `মাসিক ভাউচার সীমা শেষ (${limitConfig.monthlyVoucherLimit})` }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
 
     const voucherData = {
       id: voucherId,

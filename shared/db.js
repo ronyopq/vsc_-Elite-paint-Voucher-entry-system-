@@ -53,6 +53,16 @@ export class Database {
     return stmt.run();
   }
 
+  async linkUserGoogleId(userId, googleId) {
+    const stmt = await this.db.prepare(`
+      UPDATE users
+      SET google_id = ?1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?2
+    `).bind(googleId, userId);
+
+    return stmt.run();
+  }
+
   async blockUser(userId, blocked = true) {
     const stmt = await this.db.prepare(`
       UPDATE users SET is_blocked = ?1, updated_at = CURRENT_TIMESTAMP

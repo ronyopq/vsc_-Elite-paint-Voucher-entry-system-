@@ -9,7 +9,7 @@ import { generateId, generatePublicId, getLocalDateString } from '../shared/util
 import { handleAuthLogin, handleAuthCallback, handleAuthLogout, handleAuthUser, handleLocalLogin } from '../functions/auth.js';
 import { handleVoucherCreate, handleVoucherGet, handleVoucherGetAll, handleVoucherWorkflowUpdate, handleVoucherVerify, handleVoucherPublic, handleVoucherUpdate, handleVoucherAuditTrail, handleApprovalQueue, handleEmailNotifications, handleVoucherSoftDelete, handleExportBackup, handleMonthlyAutoReport } from '../functions/voucher.js';
 import { handleSuggestGet, handleSuggestAdd } from '../functions/suggest.js';
-import { handleAdminUsers, handleAdminBlock, handleAdminExtendTrial, handleAdminLoginAs } from '../functions/admin.js';
+import { handleAdminUsers, handleAdminBlock, handleAdminExtendTrial, handleAdminLoginAs, handleAdminCreateUser, handleAdminSetLimits } from '../functions/admin.js';
 
 export default {
   async fetch(request, env, context) {
@@ -121,6 +121,10 @@ export default {
 
           if (action === 'users' && request.method === 'GET') {
             return handleAdminUsers(request, db, sessionManager);
+          } else if (action === 'user' && apiSubpath[1] === 'create' && request.method === 'POST') {
+            return handleAdminCreateUser(request, db, sessionManager);
+          } else if (action === 'user' && apiSubpath[1] === 'set-limits' && request.method === 'POST') {
+            return handleAdminSetLimits(request, db, sessionManager);
           } else if (action === 'user' && request.method === 'POST') {
             const subaction = apiSubpath[1];
             
