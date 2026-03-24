@@ -78,6 +78,14 @@ class VoucherApp {
     const formHTML = `
       <h2>নতুন ভাউচার এন্ট্রি</h2>
       <form id="voucherEntryForm">
+        <div class="template-toolbar">
+          <select id="voucherTemplateSelect">
+            <option value="">টেমপ্লেট নির্বাচন করুন</option>
+          </select>
+          <button type="button" class="btn-secondary" onclick="app.applySelectedTemplate()">লোড টেমপ্লেট</button>
+          <button type="button" class="btn-secondary" onclick="app.saveCurrentTemplate()">টেমপ্লেট সেভ</button>
+        </div>
+
         <div class="form-row">
           <div class="form-group">
             <label>ভাউচার নম্বর *</label>
@@ -190,6 +198,7 @@ class VoucherApp {
     // Set today's date by default
     this.setToday();
     this.updateParticularsTotal();
+    this.renderTemplateOptions();
   }
 
   async handleVoucherSubmit(e) {
@@ -1284,6 +1293,79 @@ class VoucherApp {
     localStorage.removeItem('printCalibrationSettings');
     this.populatePrintCalibration();
     this.showMessage('ক্যালিব্রেশন রিসেট হয়েছে');
+  }
+
+  getVoucherTemplates() {
+    try {
+      return JSON.parse(localStorage.getItem('voucherTemplates') || '[]');
+    } catch {
+      return [];
+    }
+  }
+
+  saveVoucherTemplates(templates) {
+    localStorage.setItem('voucherTemplates', JSON.stringify(templates));
+  }
+
+  renderTemplateOptions() {
+    const select = document.getElementById('voucherTemplateSelect');
+    if (!select) return;
+
+    const templates = this.getVoucherTemplates();
+    select.innerHTML = '<option value="">টেমপ্লেট নির্বাচন করুন</option>' + templates.map((t) => (
+      `<option value="${this.escapeHtml(t.id)}">${this.escapeHtml(t.name)}</option>`
+    )).join('');
+  }
+
+  saveCurrentTemplate() {
+    const name = prompt('টেমপ্লেটের নাম দিন');
+    if (!name) return;
+
+    const template = {
+      id: `tpl-${Date.now()}`,
+      name: name.trim(),
+      payTo: document.getElementById('payTo')?.value || '',
+      codeNo: document.getElementById('codeNo')?.value || '',
+      controlAc: document.getElementById('controlAc')?.value || '',
+      accountNo: document.getElementById('accountNo')?.value || '',
+      paymentMethod: document.getElementById('paymentMethod')?.value || '',
+      particulars: [1, 2, 3, 4, 5].map((i) => ({
+        text: document.getElementById(`particular${i}`)?.value || '',
+        amount: document.getElementById(`particularAmount${i}`)?.value || ''
+      }))
+    };
+
+    const templates = this.getVoucherTemplates();
+    templates.push(template);
+    this.saveVoucherTemplates(templates);
+    this.renderTemplateOptions();
+    this.showMessage('টেমপ্লেট সংরক্ষণ হয়েছে');
+  }
+
+  applySelectedTemplate() {
+    const select = document.getElementById('voucherTemplateSelect');
+    if (!select || !select.value) return;
+
+    const templates = this.getVoucherTemplates();
+    const template = templates.find((t) => t.id === select.value);
+    if (!template) return;
+
+    document.getElementById('payTo').value = template.payTo || '';
+    document.getElementById('codeNo').value = template.codeNo || '';
+    document.getElementById('controlAc').value = template.controlAc || '';
+    document.getElementById('accountNo').value = template.accountNo || '';
+    document.getElementById('paymentMethod').value = template.paymentMethod || '';
+
+    (template.particulars || []).forEach((row, idx) => {
+      const i = idx + 1;
+      const textEl = document.getElementById(`particular${i}`);
+      const amountEl = document.getElementById(`particularAmount${i}`);
+      if (textEl) textEl.value = row.text || '';
+      if (amountEl) amountEl.value = row.amount || '';
+    });
+
+    this.updateParticularsTotal();
+    this.showMessage('টেমপ্লেট লোড হয়েছে');
   }
 
   autoIncrementVoucher() {
