@@ -806,6 +806,37 @@ class VoucherApp {
     return String(value).replace(/[0-9]/g, d => '০১২৩৪৫৬৭৮৯'[Number(d)]);
   }
 
+  buildVoucherTextOnlyPrintHTML(voucher) {
+    const rows = this.parseVoucherRows(voucher);
+    const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0) || (parseFloat(voucher.amount) || 0);
+    const dateParts = this.getDateParts(voucher.date);
+
+    return `
+      <div class="print-sheet">
+        <div class="pf pf-code">${this.escapeHtml(voucher.codeNo || '')}</div>
+        <div class="pf pf-vno">${this.escapeHtml(voucher.voucherNo || '')}</div>
+
+        <div class="pf pf-date-day">${dateParts.day}</div>
+        <div class="pf pf-date-month">${dateParts.month}</div>
+        <div class="pf pf-date-year">${dateParts.year}</div>
+
+        <div class="pf pf-payto">${this.escapeHtml(voucher.payTo || '')}</div>
+        <div class="pf pf-control">${this.escapeHtml(voucher.controlAc || '')}</div>
+
+        ${rows.map((row, idx) => `
+          <div class="pf pf-part p${idx + 1}">${this.escapeHtml(row.text)}</div>
+          <div class="pf pf-amt a${idx + 1}">${row.amount > 0 ? this.formatAmount(row.amount) : ''}</div>
+        `).join('')}
+
+        <div class="pf pf-paymethod">${this.escapeHtml(voucher.paymentMethod || '')}</div>
+        <div class="pf pf-account">${this.escapeHtml(voucher.accountNo || '')}</div>
+
+        <div class="pf pf-words">${this.numberToBanglaWords(total)}</div>
+        <div class="pf pf-total">${this.formatAmount(total)}</div>
+      </div>
+    `;
+  }
+
   printVoucher(voucher) {
     const printWindow = window.open('', '', 'width=900,height=700');
     const html = this.generatePrintHTML(voucher);
@@ -818,7 +849,7 @@ class VoucherApp {
   }
 
   generatePrintHTML(voucher) {
-    const memoHTML = this.buildVoucherMemoHTML(voucher, { forPrint: true });
+    const printOverlayHTML = this.buildVoucherTextOnlyPrintHTML(voucher);
     return `
 <!DOCTYPE html>
 <html lang="bn">
@@ -826,15 +857,57 @@ class VoucherApp {
   <meta charset="UTF-8">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    @page { size: 8.3in 5.65in; margin: 0; }
+    @page { size: 21.1cm 14.35cm; margin: 0; }
     * { box-sizing: border-box; }
-    html, body { width: 8.3in; height: 5.65in; margin: 0; padding: 0; background: white; overflow: hidden; }
+    html, body { width: 21.1cm; height: 14.35cm; margin: 0; padding: 0; background: transparent; overflow: hidden; }
     body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .voucher-memo { box-shadow: none !important; margin: 0 !important; }
+
+    /* Text-only overlay for pre-printed form paper */
+    .print-sheet {
+      position: relative;
+      width: 21.1cm;
+      height: 14.35cm;
+      font-family: 'Noto Serif Bengali', serif;
+      color: #000;
+      font-size: 11px;
+      line-height: 1;
+    }
+
+    .pf {
+      position: absolute;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pf-code { left: 2.0cm; top: 4.35cm; width: 2.3cm; }
+    .pf-vno { left: 18.15cm; top: 3.95cm; width: 2.1cm; text-align: center; }
+
+    .pf-date-day { left: 18.0cm; top: 4.62cm; width: 0.8cm; text-align: center; }
+    .pf-date-month { left: 18.85cm; top: 4.62cm; width: 0.8cm; text-align: center; }
+    .pf-date-year { left: 19.75cm; top: 4.62cm; width: 1.2cm; text-align: center; }
+
+    .pf-payto { left: 1.2cm; top: 5.20cm; width: 15.8cm; }
+    .pf-control { left: 12.9cm; top: 6.03cm; width: 8.0cm; }
+
+    .pf-part { left: 0.8cm; width: 14.7cm; }
+    .pf-amt { left: 15.65cm; width: 3.95cm; text-align: right; }
+
+    .p1, .a1 { top: 7.11cm; }
+    .p2, .a2 { top: 7.76cm; }
+    .p3, .a3 { top: 8.41cm; }
+    .p4, .a4 { top: 9.06cm; }
+    .p5, .a5 { top: 9.71cm; }
+
+    .pf-paymethod { left: 0.95cm; top: 10.42cm; width: 6.1cm; }
+    .pf-account { left: 8.35cm; top: 10.42cm; width: 4.1cm; }
+
+    .pf-words { left: 1.1cm; top: 11.32cm; width: 14.45cm; white-space: normal; line-height: 1.1; }
+    .pf-total { left: 15.65cm; top: 11.99cm; width: 3.95cm; text-align: right; font-weight: 700; }
   </style>
 </head>
 <body>
-  ${memoHTML}
+  ${printOverlayHTML}
 </body>
 </html>
     `;
