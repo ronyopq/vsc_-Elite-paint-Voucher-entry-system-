@@ -7,7 +7,7 @@ import { generateId, generatePublicId, getLocalDateString } from '../shared/util
 
 // Import route handlers
 import { handleAuthLogin, handleAuthCallback, handleAuthLogout, handleAuthUser, handleLocalLogin } from '../functions/auth.js';
-import { handleVoucherCreate, handleVoucherGet, handleVoucherGetAll, handleVoucherWorkflowUpdate, handleVoucherVerify, handleVoucherPublic, handleVoucherUpdate, handleVoucherAuditTrail, handleApprovalQueue, handleEmailNotifications } from '../functions/voucher.js';
+import { handleVoucherCreate, handleVoucherGet, handleVoucherGetAll, handleVoucherWorkflowUpdate, handleVoucherVerify, handleVoucherPublic, handleVoucherUpdate, handleVoucherAuditTrail, handleApprovalQueue, handleEmailNotifications, handleVoucherSoftDelete, handleExportBackup, handleMonthlyAutoReport } from '../functions/voucher.js';
 import { handleSuggestGet, handleSuggestAdd } from '../functions/suggest.js';
 import { handleAdminUsers, handleAdminBlock, handleAdminExtendTrial, handleAdminLoginAs } from '../functions/admin.js';
 
@@ -72,15 +72,21 @@ export default {
           const action = apiSubpath[0];
           
           if (request.method === 'POST' && action === 'create') {
-            return handleVoucherCreate(request, db, sessionManager);
+            return handleVoucherCreate(request, db, sessionManager, env);
           } else if (request.method === 'PUT' && action === 'update' && apiSubpath[1]) {
             return handleVoucherUpdate(request, db, sessionManager, apiSubpath[1]);
+          } else if (request.method === 'POST' && action === 'soft-delete' && apiSubpath[1]) {
+            return handleVoucherSoftDelete(request, db, sessionManager, apiSubpath[1]);
           } else if (request.method === 'POST' && action === 'workflow' && apiSubpath[1]) {
             return handleVoucherWorkflowUpdate(request, db, sessionManager, apiSubpath[1], env);
           } else if (request.method === 'GET' && action === 'verify' && apiSubpath[1]) {
             return handleVoucherVerify(request, db, apiSubpath[1]);
           } else if (request.method === 'GET' && action === 'audit' && apiSubpath[1]) {
             return handleVoucherAuditTrail(request, db, sessionManager, apiSubpath[1]);
+          } else if (request.method === 'GET' && action === 'export-backup') {
+            return handleExportBackup(request, db, sessionManager);
+          } else if (request.method === 'GET' && action === 'monthly-auto-report') {
+            return handleMonthlyAutoReport(request, db, sessionManager);
           } else if (request.method === 'GET' && action === 'approval-queue') {
             return handleApprovalQueue(request, db, sessionManager);
           } else if (request.method === 'GET' && action === 'notifications') {

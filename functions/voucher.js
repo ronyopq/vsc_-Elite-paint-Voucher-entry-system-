@@ -4,6 +4,27 @@ import Database from '../shared/db.js';
 import { requireAuth } from '../shared/auth.js';
 import { generateId, generatePublicId, convertNumberToBangla, getLocalDateString, hashToken } from '../shared/utils.js';
 
+const SOFT_DELETE_SETTING_KEY = 'soft_delete_registry_v1';
+
+async function getSoftDeleteRegistry(db) {
+  try {
+    const raw = await db.getSetting(SOFT_DELETE_SETTING_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function setSoftDeleteRegistry(db, registry, updatedBy = null) {
+  await db.setSetting(SOFT_DELETE_SETTING_KEY, JSON.stringify(registry || {}), updatedBy);
+}
+
+function isVoucherSoftDeleted(registry, voucherId) {
+  return Boolean(registry && registry[voucherId] && registry[voucherId].deletedAt);
+}
+
 async function queueWorkflowEmailNotification(env, payload) {
   const now = new Date().toISOString();
   const body = {
@@ -30,7 +51,7 @@ async function queueWorkflowEmailNotification(env, payload) {
 }
 
 // Create voucher
-export async function handleVoucherCreate(request, db, sessionManager) {
+export async function handleVoucherCreate(request, db, sessionManager, env) {
   const [session, authError] = await requireAuth(request, sessionManager);
 
   if (authError) {
@@ -68,7 +89,12 @@ export async function handleVoucherCreate(request, db, sessionManager) {
       amount: parseFloat(data.amount),
       amountWords: amountWords,
       accountNo: data.accountNo || '',
-      paymentMethod: data.paymentMethod || ''
+      paymentMethod: data.paymentMethod || '',
+      preparedBy: session.name || session.email || 'System',
+      verifiedBy: session.name || session.email || 'System',
+      recommendedBy: session.name || session.email || 'System',
+      approvedBy: session.name || session.email || 'System',
+      status: 'printed'
     };
 
     await db.createVoucher(voucherData);
@@ -78,15 +104,23 @@ export async function handleVoucherCreate(request, db, sessionManager) {
       voucherNo: data.voucherNo,
       stage: 'created',
       actor: session.name || session.email || 'System',
-      nextRole: 'admin'
+      nextRole: 'completed'
     };
-    const createNotifyResult = await queueWorkflowEmailNotification(null, createNotifyPayload);
+    const createNotifyResult = await queueWorkflowEmailNotification(env, createNotifyPayload);
     await db.logAction(
       session.userId,
       'email_notification_queued',
       'voucher',
       voucherId,
       JSON.stringify({ ...createNotifyPayload, notifyResult: createNotifyResult })
+    );
+
+    await db.logAction(
+      session.userId,
+      'voucher_auto_approved',
+      'voucher',
+      voucherId,
+      JSON.stringify({ policy: 'auto_approve_on_create' })
     );
 
     // Add to saved lists
@@ -142,6 +176,14 @@ export async function handleVoucherGet(request, db, sessionManager, voucherId) {
       });
     }
 
+    const registry = await getSoftDeleteRegistry(db);
+    if (isVoucherSoftDeleted(registry, voucherId)) {
+      return new Response(JSON.stringify({ error: 'Voucher সফট ডিলিট করা হয়েছে' }), {
+        status: 410,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     return new Response(JSON.stringify({ voucher }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
@@ -171,9 +213,11 @@ export async function handleVoucherGetAll(request, db, sessionManager) {
     const offset = page * limit;
 
     const vouchers = await db.getUserVouchers(session.userId, limit, offset);
+    const registry = await getSoftDeleteRegistry(db);
+    const visibleVouchers = (vouchers.results || []).filter((v) => !isVoucherSoftDeleted(registry, v.id));
 
     return new Response(JSON.stringify({
-      vouchers: vouchers.results || [],
+      vouchers: visibleVouchers,
       page,
       limit
     }), {
@@ -214,63 +258,14 @@ export async function handleVoucherWorkflowUpdate(request, db, sessionManager, v
       });
     }
 
-    const data = await request.json();
-    const stage = String(data.stage || '').trim().toLowerCase();
-    const actor = data.actor || session.name || session.email || 'System';
-
-    const allowedStages = ['prepared', 'verified', 'recommended', 'approved'];
-    if (!allowedStages.includes(stage)) {
-      return new Response(JSON.stringify({ error: 'Invalid workflow stage' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    const stageFieldMap = {
-      prepared: 'preparedBy',
-      verified: 'verifiedBy',
-      recommended: 'recommendedBy',
-      approved: 'approvedBy'
-    };
-
-    const stagePermissions = {
-      prepared: ['user', 'admin', 'super_admin'],
-      verified: ['admin', 'super_admin'],
-      recommended: ['admin', 'super_admin'],
-      approved: ['super_admin']
-    };
-
-    if (!stagePermissions[stage].includes(session.role)) {
-      return new Response(JSON.stringify({ error: 'You are not allowed for this stage' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (stage === 'verified' && !voucher.prepared_by) {
-      return new Response(JSON.stringify({ error: 'Prepare stage is required first' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (stage === 'recommended' && !voucher.verified_by) {
-      return new Response(JSON.stringify({ error: 'Verify stage is required first' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (stage === 'approved' && !voucher.recommended_by) {
-      return new Response(JSON.stringify({ error: 'Recommend stage is required first' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+    const actor = session.name || session.email || 'System';
 
     const updates = {
-      [stageFieldMap[stage]]: actor,
-      status: stage === 'approved' ? 'printed' : 'saved'
+      preparedBy: voucher.prepared_by || actor,
+      verifiedBy: voucher.verified_by || actor,
+      recommendedBy: voucher.recommended_by || actor,
+      approvedBy: voucher.approved_by || actor,
+      status: 'printed'
     };
 
     await db.updateVoucher(voucherId, updates);
@@ -278,25 +273,18 @@ export async function handleVoucherWorkflowUpdate(request, db, sessionManager, v
 
     await db.logAction(
       session.userId,
-      `voucher_${stage}`,
+      'voucher_auto_approved_sync',
       'voucher',
       voucherId,
-      JSON.stringify({ stage, actor })
+      JSON.stringify({ actor })
     );
-
-    const nextRoleByStage = {
-      prepared: 'admin',
-      verified: 'admin',
-      recommended: 'super_admin',
-      approved: 'completed'
-    };
 
     const notificationPayload = {
       voucherId,
       voucherNo: voucher.voucher_no,
-      stage,
+      stage: 'auto_approved',
       actor,
-      nextRole: nextRoleByStage[stage] || 'admin'
+      nextRole: 'completed'
     };
 
     const notifyResult = await queueWorkflowEmailNotification(env, notificationPayload);
@@ -444,30 +432,13 @@ export async function handleApprovalQueue(request, db, sessionManager) {
 
   try {
     const role = session.role || 'user';
-    const vouchersRaw = (role === 'user')
-      ? await db.getUserVouchers(session.userId, 500, 0)
-      : await db.getAllVouchers(1000, 0);
-    const vouchers = vouchersRaw.results || [];
-    let queue = [];
-
-    if (role === 'user') {
-      queue = vouchers
-        .filter((v) => !v.prepared_by)
-        .map((v) => ({ ...v, nextStage: 'prepared' }));
-    } else if (role === 'admin') {
-      queue = vouchers
-        .filter((v) => (v.prepared_by && !v.verified_by) || (v.verified_by && !v.recommended_by))
-        .map((v) => ({ ...v, nextStage: v.verified_by ? 'recommended' : 'verified' }));
-    } else {
-      queue = vouchers
-        .filter((v) => v.recommended_by && !v.approved_by)
-        .map((v) => ({ ...v, nextStage: 'approved' }));
-    }
+    const queue = [];
 
     return new Response(JSON.stringify({
       role,
-      total: queue.length,
-      queue
+      total: 0,
+      queue,
+      mode: 'auto-approved'
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
@@ -498,6 +469,175 @@ export async function handleEmailNotifications(request, db, sessionManager) {
     });
   } catch (error) {
     console.error('Email notification fetch error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+export async function handleVoucherSoftDelete(request, db, sessionManager, voucherId) {
+  const [session, authError] = await requireAuth(request, sessionManager);
+
+  if (authError) {
+    return authError;
+  }
+
+  try {
+    const voucher = await db.getVoucher(voucherId);
+    if (!voucher) {
+      return new Response(JSON.stringify({ error: 'Voucher not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (voucher.user_id !== session.userId && session.role !== 'admin' && session.role !== 'super_admin') {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const data = await request.json().catch(() => ({}));
+    const reason = String(data.reason || '').trim();
+
+    const registry = await getSoftDeleteRegistry(db);
+    registry[voucherId] = {
+      deletedAt: new Date().toISOString(),
+      deletedBy: session.userId,
+      reason,
+      voucherNo: voucher.voucher_no
+    };
+    await setSoftDeleteRegistry(db, registry, session.userId);
+
+    await db.logAction(
+      session.userId,
+      'voucher_soft_deleted',
+      'voucher',
+      voucherId,
+      JSON.stringify({ reason })
+    );
+
+    return new Response(JSON.stringify({ success: true, softDeleted: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Voucher soft delete error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+export async function handleExportBackup(request, db, sessionManager) {
+  const [session, authError] = await requireAuth(request, sessionManager);
+
+  if (authError) {
+    return authError;
+  }
+
+  try {
+    const vouchersRaw = await db.getUserVouchers(session.userId, 10000, 0);
+    const savedListsRaw = await db.getUserSavedListsAll(session.userId, 10000);
+    const auditRaw = await db.getUserAuditLogs(session.userId, 10000);
+    const softDeleteRegistry = await getSoftDeleteRegistry(db);
+
+    const payload = {
+      backupVersion: 1,
+      exportedAt: new Date().toISOString(),
+      user: {
+        id: session.userId,
+        email: session.email || '',
+        name: session.name || ''
+      },
+      vouchers: vouchersRaw.results || [],
+      savedLists: savedListsRaw.results || [],
+      auditLogs: auditRaw.results || [],
+      softDeletedRegistry: softDeleteRegistry
+    };
+
+    await db.logAction(session.userId, 'backup_exported', 'backup', session.userId, JSON.stringify({ vouchers: payload.vouchers.length }));
+
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="backup-${new Date().toISOString().slice(0, 10)}.json"`
+      }
+    });
+  } catch (error) {
+    console.error('Export backup error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+export async function handleMonthlyAutoReport(request, db, sessionManager) {
+  const [session, authError] = await requireAuth(request, sessionManager);
+
+  if (authError) {
+    return authError;
+  }
+
+  try {
+    const url = new URL(request.url);
+    const now = new Date();
+    const monthKey = url.searchParams.get('month') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const reportSettingKey = `monthly_auto_report:${session.userId}:${monthKey}`;
+
+    const existing = await db.getSetting(reportSettingKey);
+    if (existing) {
+      return new Response(JSON.stringify({
+        report: JSON.parse(existing),
+        cached: true
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const vouchersRaw = await db.getUserVouchers(session.userId, 10000, 0);
+    const allVouchers = vouchersRaw.results || [];
+    const softDeleteRegistry = await getSoftDeleteRegistry(db);
+
+    const monthlyRows = allVouchers.filter((v) => {
+      if (isVoucherSoftDeleted(softDeleteRegistry, v.id)) return false;
+      const d = String(v.date || '');
+      return d.startsWith(`${monthKey}-`) || d.startsWith(monthKey);
+    });
+
+    const totalAmount = monthlyRows.reduce((sum, v) => sum + (parseFloat(v.amount) || 0), 0);
+    const byPayee = {};
+    monthlyRows.forEach((v) => {
+      const key = String(v.pay_to || 'Unknown').trim() || 'Unknown';
+      if (!byPayee[key]) byPayee[key] = { name: key, count: 0, total: 0 };
+      byPayee[key].count += 1;
+      byPayee[key].total += parseFloat(v.amount) || 0;
+    });
+
+    const report = {
+      month: monthKey,
+      generatedAt: new Date().toISOString(),
+      totalVouchers: monthlyRows.length,
+      totalAmount,
+      approvedVouchers: monthlyRows.length,
+      topPayees: Object.values(byPayee).sort((a, b) => b.total - a.total).slice(0, 10)
+    };
+
+    await db.setSetting(reportSettingKey, JSON.stringify(report), session.userId);
+    await db.logAction(session.userId, 'monthly_report_generated', 'report', monthKey, JSON.stringify(report));
+
+    return new Response(JSON.stringify({ report, cached: false }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Monthly auto report error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
@@ -567,6 +707,14 @@ export async function handleVoucherPublic(request, db, env) {
     const voucher = await db.getVoucherByPublicId(publicId);
 
     if (!voucher) {
+      return new Response(JSON.stringify({ error: 'Voucher not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const softDeleteRegistry = await getSoftDeleteRegistry(db);
+    if (isVoucherSoftDeleted(softDeleteRegistry, voucher.id)) {
       return new Response(JSON.stringify({ error: 'Voucher not found' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' }

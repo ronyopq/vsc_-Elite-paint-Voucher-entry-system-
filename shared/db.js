@@ -77,18 +77,21 @@ export class Database {
   async createVoucher(voucherData) {
     const {
       id, userId, publicId, date, voucherNo, payTo, codeNo, 
-      controlAc, particulars, amount, amountWords, accountNo, paymentMethod
+      controlAc, particulars, amount, amountWords, accountNo, paymentMethod,
+      preparedBy = null, verifiedBy = null, recommendedBy = null, approvedBy = null, status = 'printed'
     } = voucherData;
 
     const stmt = await this.db.prepare(`
       INSERT INTO vouchers (
         id, user_id, public_id, date, voucher_no, pay_to, code_no,
-        control_ac, particulars, amount, amount_words, account_no, payment_method
+        control_ac, particulars, amount, amount_words, account_no, payment_method,
+        prepared_by, verified_by, recommended_by, approved_by, status
       )
-      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
     `).bind(
       id, userId, publicId, date, voucherNo, payTo, codeNo,
-      controlAc, particulars, amount, amountWords, accountNo, paymentMethod
+      controlAc, particulars, amount, amountWords, accountNo, paymentMethod,
+      preparedBy, verifiedBy, recommendedBy, approvedBy, status
     );
 
     return stmt.run();
@@ -111,6 +114,28 @@ export class Database {
       ORDER BY created_at DESC
       LIMIT ?2 OFFSET ?3
     `).bind(userId, limit, offset);
+
+    return stmt.all();
+  }
+
+  async getUserSavedListsAll(userId, limit = 5000) {
+    const stmt = await this.db.prepare(`
+      SELECT * FROM saved_lists
+      WHERE user_id = ?1
+      ORDER BY added_at DESC
+      LIMIT ?2
+    `).bind(userId, limit);
+
+    return stmt.all();
+  }
+
+  async getUserAuditLogs(userId, limit = 5000) {
+    const stmt = await this.db.prepare(`
+      SELECT * FROM audit_logs
+      WHERE user_id = ?1
+      ORDER BY created_at DESC
+      LIMIT ?2
+    `).bind(userId, limit);
 
     return stmt.all();
   }

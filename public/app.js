@@ -1616,6 +1616,7 @@ class VoucherApp {
         <input type="number" min="0" step="0.01" placeholder="সর্বনিম্ন টাকা" value="${this.escapeHtml(String(this.historyAdvanced.amountMin || ''))}" onchange="app.setHistoryAdvancedFilter('amountMin', this.value)">
         <input type="number" min="0" step="0.01" placeholder="সর্বোচ্চ টাকা" value="${this.escapeHtml(String(this.historyAdvanced.amountMax || ''))}" onchange="app.setHistoryAdvancedFilter('amountMax', this.value)">
         <button class="btn-secondary" onclick="app.clearHistoryFilters()">ফিল্টার রিসেট</button>
+        <button class="btn-secondary" onclick="app.exportAllBackup()">Full Backup</button>
         <button class="btn-secondary" onclick="app.exportVouchersExcel()">Excel Export</button>
         <button class="btn-secondary" onclick="app.exportVouchersCSV()">CSV Export</button>
         <button class="btn-secondary" onclick="app.exportVouchersJSON()">JSON Export</button>
@@ -1644,6 +1645,7 @@ class VoucherApp {
                 <button onclick="app.viewVoucher('${v.id}')" class="btn-small">দেখুন</button>
                 <button onclick="app.editVoucher('${v.id}')" class="btn-small">এডিট</button>
                 <button onclick="app.viewAuditTrail('${v.id}')" class="btn-small">Audit</button>
+                <button onclick="app.softDeleteVoucher('${v.id}')" class="btn-small">Soft Delete</button>
                 ${settings.publicUrl.enabled && settings.publicUrl.showShareButtons ? `<button onclick="app.shareVoucher('${v.public_id}')" class="btn-small">শেয়ার</button>` : ''}
                 ${settings.publicUrl.enabled && settings.publicUrl.showVerifyLink ? `<button onclick="app.copyVerifyLink('${v.public_id}')" class="btn-small">Verify Link</button>` : ''}
                 ${this.renderWorkflowActionButtons(v)}
@@ -1676,6 +1678,14 @@ class VoucherApp {
       <div class="report-section">
         <h3>ব্যাংক রিকনসিলিয়েশন</h3>
         <div id="bankReconciliation"></div>
+      </div>
+      <div class="report-section">
+        <h3>মাসিক স্বয়ংক্রিয় রিপোর্ট</h3>
+        <div class="history-toolbar">
+          <input type="month" id="monthlyAutoReportMonth">
+          <button class="btn-primary" onclick="app.loadMonthlyAutoReport()">Generate Monthly Report</button>
+        </div>
+        <div id="monthlyAutoReportBox"></div>
       </div>
       <div class="report-section">
         <h3>Custom Report Builder</h3>
@@ -1753,6 +1763,7 @@ class VoucherApp {
         : '<p>কোন ডাটা নেই</p>';
 
       document.getElementById('bankReconciliation').innerHTML = this.renderBankReconciliation();
+      await this.loadMonthlyAutoReport();
       await this.loadApprovalQueueDashboard();
       await this.loadEmailNotificationLog();
       this.generateCustomReport();
@@ -2196,7 +2207,7 @@ class VoucherApp {
       `).join('');
 
       document.getElementById('approvalQueue').innerHTML = `
-        <p>Role: ${this.escapeHtml(data.role || '')} | Pending: ${data.total || 0}</p>
+        <p>Mode: ${this.escapeHtml(data.mode || 'manual')} | Role: ${this.escapeHtml(data.role || '')} | Pending: ${data.total || 0}</p>
         <table class="history-table">
           <thead><tr><th>ভাউচার</th><th>পে-টু</th><th>টাকা</th><th>Next Stage</th><th>Action</th></tr></thead>
           <tbody>${rows || '<tr><td colspan="5">Queue empty</td></tr>'}</tbody>
@@ -2285,18 +2296,7 @@ class VoucherApp {
   }
 
   renderWorkflowActionButtons(voucher) {
-    const actions = [
-      { stage: 'prepared', label: 'প্রস্তুত', requires: null },
-      { stage: 'verified', label: 'যাচাই', requires: 'prepared_by' },
-      { stage: 'recommended', label: 'সুপারিশ', requires: 'verified_by' },
-      { stage: 'approved', label: 'অনুমোদন', requires: 'recommended_by' }
-    ];
-
-    return actions
-      .filter((a) => this.isStageAllowedForRole(a.stage))
-      .filter((a) => !a.requires || voucher[a.requires])
-      .map((a) => `<button onclick="app.updateVoucherWorkflow('${voucher.id}', '${a.stage}')" class="btn-small">${a.label}</button>`)
-      .join('');
+    return '';
   }
 
   async copyVerifyLink(publicId) {
@@ -2437,6 +2437,83 @@ class VoucherApp {
     });
 
     this.downloadTextFile(`vouchers-${new Date().toISOString().slice(0, 10)}.xls`, lines.join('\n'), 'application/vnd.ms-excel;charset=utf-8');
+  }
+
+  async exportAllBackup() {
+    try {
+      const response = await fetch(`${this.apiBase}/api/voucher/export-backup`);
+      if (!response.ok) {
+        const data = await response.json();
+        this.showError(data.error || 'Backup export ব্যর্থ');
+        return;
+      }
+
+      const payload = await response.json();
+      this.downloadTextFile(`full-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
+      this.showMessage('Full backup export সম্পন্ন হয়েছে');
+    } catch (error) {
+      console.error('Export backup error:', error);
+      this.showError('Backup export করা যায়নি');
+    }
+  }
+
+  async softDeleteVoucher(voucherId) {
+    const reason = prompt('Soft delete কারণ লিখুন (ঐচ্ছিক)') || '';
+    const confirmed = confirm('আপনি কি এই ভাউচার soft delete করতে চান?');
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`${this.apiBase}/api/voucher/soft-delete/${voucherId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        this.showError(data.error || 'Soft delete ব্যর্থ');
+        return;
+      }
+
+      this.showMessage('ভাউচার soft delete হয়েছে (audit trail অক্ষত)');
+      this.loadVoucherHistory();
+    } catch (error) {
+      console.error('Soft delete error:', error);
+      this.showError('Soft delete করা যায়নি');
+    }
+  }
+
+  async loadMonthlyAutoReport() {
+    try {
+      const monthInput = document.getElementById('monthlyAutoReportMonth');
+      const selectedMonth = monthInput?.value || '';
+      if (monthInput && !monthInput.value) {
+        monthInput.value = new Date().toISOString().slice(0, 7);
+      }
+
+      const query = selectedMonth ? `?month=${encodeURIComponent(selectedMonth)}` : '';
+      const response = await fetch(`${this.apiBase}/api/voucher/monthly-auto-report${query}`);
+      const data = await response.json();
+      if (!response.ok) {
+        document.getElementById('monthlyAutoReportBox').innerHTML = `<p>${this.escapeHtml(data.error || 'Report load failed')}</p>`;
+        return;
+      }
+
+      const report = data.report || {};
+      const topRows = (report.topPayees || []).map((p) => `<p>${this.escapeHtml(p.name)}: ${p.count} টি, ${this.formatAmount(p.total)} টাকা</p>`).join('');
+
+      document.getElementById('monthlyAutoReportBox').innerHTML = `
+        <p><strong>মাস:</strong> ${this.escapeHtml(report.month || '')} ${data.cached ? '(Cached)' : '(Generated)'}</p>
+        <p><strong>মোট ভাউচার:</strong> ${report.totalVouchers || 0}</p>
+        <p><strong>মোট পরিমাণ:</strong> ${this.formatAmount(report.totalAmount || 0)} টাকা</p>
+        <p><strong>Auto Approved:</strong> ${report.approvedVouchers || 0}</p>
+        <h4>Top Payees</h4>
+        ${topRows || '<p>কোন ডাটা নেই</p>'}
+      `;
+    } catch (error) {
+      console.error('Monthly auto report load error:', error);
+      const box = document.getElementById('monthlyAutoReportBox');
+      if (box) box.innerHTML = '<p>Monthly auto report লোড ব্যর্থ</p>';
+    }
   }
 
   exportVouchersJSON() {
