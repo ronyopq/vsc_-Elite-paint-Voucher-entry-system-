@@ -546,3 +546,302 @@ h3 {
   margin-bottom: 20px;
   border: 1px solid #bde6cb;
 }
+
+/* Animated Notification Modal */
+.notification-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.notification-card {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  position: relative;
+  animation: slideUp 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+  text-align: center;
+}
+
+.notification-icon {
+  font-size: 56px;
+  margin-bottom: 16px;
+  animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes popIn {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.notification-content h3 {
+  font-size: 20px;
+  color: #0f172a;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.notification-content p {
+  color: #5b6b82;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.notification-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.notification-actions button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.notification-actions .btn-primary {
+  background: #0f4c81;
+  color: white;
+}
+
+.notification-actions .btn-primary:hover {
+  background: #09375e;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(15, 76, 129, 0.3);
+}
+
+.notification-actions .btn-secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.notification-actions .btn-secondary:hover {
+  background: #cbd5e1;
+  transform: translateY(-2px);
+}
+
+.notification-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #5b6b82;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.notification-close:hover {
+  background: #f0f4f8;
+  color: #0f172a;
+}
+
+/* Sticky Button */
+.sticky-btn {
+  margin-left: auto;
+  background: linear-gradient(135deg, #11a39a 0%, #0e8a83 100%);
+  color: white;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(17, 163, 154, 0.3);
+  animation: slideInRight 0.4s ease;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.sticky-btn:hover {
+  background: linear-gradient(135deg, #0e8a83 0%, #0a6d68 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(17, 163, 154, 0.4);
+}
+
+.sticky-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(17, 163, 154, 0.3);
+}
+
+/* Select2 Customization */
+.select2-container--default .select2-selection--single {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  height: 44px;
+  font-size: 14px;
+  background-color: #f8fafc;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+  color: #0f172a;
+  line-height: 42px;
+  padding-left: 12px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+  height: 42px;
+  right: 8px;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow b {
+  border-color: #0f4c81 transparent transparent transparent;
+  top: 60%;
+}
+
+.select2-container--default .select2-selection--single:focus {
+  border-color: #0f4c81;
+  box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.12);
+}
+
+.select2-dropdown {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.select2-results__option {
+  padding: 10px 12px;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.select2-results__option--highlighted[aria-selected],
+.select2-results__option[aria-selected="true"] {
+  background: #0f4c81 !important;
+}
+
+.select2-container--default .select2-search--dropdown .select2-search__field {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.select2-container--open .select2-dropdown--below {
+  top: 48px !important;
+}
+
+/* Payee Description Support */
+.payee-description {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.payee-description input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #5b6b82;
+}
+
+/* Print/PDF Modal Buttons */
+.modal-print-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.modal-print-actions button {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.modal-print-btn {
+  background: #0f4c81;
+  color: white;
+}
+
+.modal-print-btn:hover {
+  background: #09375e;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(15, 76, 129, 0.3);
+}
+
+.modal-pdf-btn {
+  background: #ea4335;
+  color: white;
+}
+
+.modal-pdf-btn:hover {
+  background: #c5221f;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(234, 67, 53, 0.3);
+}
+
+/* QR Code Size Reduction */
+.memo-qr {
+  width: 60px !important;
+  height: 60px !important;
+}

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>এলিট পেইন্ট ভাউচার এন্ট্রি সিস্টেম</title>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/css/select2.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css">
   <style>
     * {
@@ -495,6 +496,19 @@
   </style>
 </head>
 <body>
+  <!-- Animated Notification Popup Modal -->
+  <div id="notificationModal" class="notification-modal" style="display:none;">
+    <div class="notification-card">
+      <div class="notification-icon" id="notificationIcon"></div>
+      <div class="notification-content">
+        <h3 id="notificationTitle"></h3>
+        <p id="notificationMessage"></p>
+        <div class="notification-actions" id="notificationActions"></div>
+      </div>
+      <button class="notification-close" onclick="app.closeNotification()">×</button>
+    </div>
+  </div>
+
   <div class="error" id="errorMessage"></div>
 
   <!-- Auth Page -->
@@ -568,6 +582,7 @@
       <button onclick="switchTab('history')">ইতিহাস</button>
       <button onclick="switchTab('reports')">রিপোর্ট</button>
       <button onclick="switchTab('settings')">সেটিংস</button>
+      <button class="sticky-btn" id="stickyNewVoucherBtn" onclick="app.newVoucherQuick()" title="দ্রুত নতুন ভাউচার">+ নতুন</button>
     </div>
 
     <div class="content">
@@ -594,6 +609,8 @@
     </div>
   </div>
 
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/js/select2.min.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

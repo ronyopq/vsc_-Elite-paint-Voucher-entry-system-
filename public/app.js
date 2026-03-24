@@ -101,7 +101,7 @@ class VoucherApp {
       },
       qr: {
         enabled: true,
-        size: 95,
+        size: 60,
         x: 0,
         y: 0
       },
@@ -187,18 +187,161 @@ class VoucherApp {
     return maxFound + 1;
   }
 
+  // Bengali Number-to-Word Converter (Indian Format)
+  convertNumberToBengaliWords(num) {
+    if (num === 0) return 'শূন্য';
+    
+    const ones = ['', 'এক', 'দুই', 'তিন', 'চার', 'পাঁচ', 'ছয়', 'সাত', 'আট', 'নয়'];
+    const teens = ['দশ', 'এগার', 'বার', 'তের', 'চৌদ্দ', 'পনের', 'ষোল', 'সতের', 'আঠার', 'উনিশ'];
+    const tens = ['', '', 'বিশ', 'ত্রিশ', 'চল্লিশ', 'পঞ্চাশ', 'ষাট', 'সত্তর', 'আশি', 'নব্বই'];
+    const scales = [
+      { name: 'কোটি', value: 10000000 },
+      { name: 'লক্ষ', value: 100000 },
+      { name: 'হাজার', value: 1000 },
+      { name: 'শত', value: 100 }
+    ];
+
+    const convertHundreds = (n) => {
+      let result = '';
+      const hundred = Math.floor(n / 100);
+      if (hundred > 0) {
+        result += ones[hundred] + ' শত ';
+      }
+      const remainder = n % 100;
+      if (remainder >= 10 && remainder < 20) {
+        result += teens[remainder - 10] + ' ';
+      } else {
+        const ten = Math.floor(remainder / 10);
+        const one = remainder % 10;
+        if (ten > 0) result += tens[ten] + ' ';
+        if (one > 0) result += ones[one] + ' ';
+      }
+      return result.trim();
+    };
+
+    let result = '';
+    let n = Math.floor(num);
+    
+    for (const scale of scales) {
+      const part = Math.floor(n / scale.value);
+      if (part > 0) {
+        result += convertHundreds(part) + ' ' + scale.name + ' ';
+        n %= scale.value;
+      }
+    }
+
+    if (n > 0) {
+      result += convertHundreds(n);
+    }
+
+    return result.trim() + ' টাকা';
+  }
+
+  // Animated Notification System
+  showNotification(title, message, type = 'success', actions = []) {
+    const modal = document.getElementById('notificationModal');
+    const iconEl = document.getElementById('notificationIcon');
+    const titleEl = document.getElementById('notificationTitle');
+    const messageEl = document.getElementById('notificationMessage');
+    const actionsEl = document.getElementById('notificationActions');
+
+    // Set icon based on type
+    const icons = {
+      success: '✓',
+      error: '✕',
+      warning: '⚠',
+      info: 'ℹ'
+    };
+    iconEl.textContent = icons[type] || icons.info;
+    iconEl.style.color = {
+      'success': '#0f4c81',
+      'error': '#ea4335',
+      'warning': '#f59e0b',
+      'info': '#0f4c81'
+    }[type] || '#0f4c81';
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+
+    // Render action buttons
+    actionsEl.innerHTML = actions.map(action => {
+      const btnClass = action.type === 'primary' ? 'btn-primary' : 'btn-secondary';
+      return `<button class="${btnClass}" onclick="${action.handler}">${action.label}</button>`;
+    }).join('');
+
+    modal.style.display = 'flex';
+
+    // Auto-close after 5 seconds if no interactive actions
+    if (actions.length === 0) {
+      setTimeout(() => {
+        this.closeNotification();
+      }, 5000);
+    }
+  }
+
+  closeNotification() {
+    const modal = document.getElementById('notificationModal');
+    modal.style.display = 'none';
+  }
+
+  // PDF Export with jsPDF library (fallback to print)
+  async exportVoucherToPDF(voucher) {
+    const voucherHtml = this.buildVoucherMemoHTML(voucher, { forPrint: true });
+    
+    // Create temporary container
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = voucherHtml;
+    tempDiv.style.display = 'none';
+    document.body.appendChild(tempDiv);
+
+    // Use html2canvas and jsPDF if available, otherwise fallback to print
+    try {
+      const script1 = await import('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+      const script2 = await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+      
+      const html2canvas = script1.default;
+      const jsPDF = script2.jsPDF;
+
+      const canvas = await html2canvas(tempDiv.querySelector('.voucher-memo'));
+      const img = canvas.toDataURL('image/png');
+      const pdf = new jsPDF.jsPDF({
+        orientation: 'landscape',
+        unit: 'cm',
+        format: [21.1, 14.35]
+      });
+      pdf.addImage(img, 'PNG', 0, 0, 21.1, 14.35);
+      pdf.save(`voucher-${voucher.public_id || 'export'}.pdf`);
+    } catch {
+      // Fallback: Open print dialog
+      const printWindow = window.open('', '', 'width=900,height=700');
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="bn">
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            @page { size: 21.1cm 14.35cm; margin: 0; }
+            * { box-sizing: border-box; }
+            html, body { margin: 0; padding: 0; }
+            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+          </style>
+        </head>
+        <body>
+          ${voucherHtml}
+          <script>
+            window.print();
+          </script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+    
+    document.body.removeChild(tempDiv);
+  }
+
   initVoucherForm() {
     const userSettings = this.getUserSettings();
-    const headOptions = (userSettings.headOfAccounts.options || []).map(opt => `<option value="${this.escapeHtml(opt)}"></option>`).join('');
-    const controlOptions = (userSettings.controlAccount.options || []).map(opt => `<option value="${this.escapeHtml(opt)}"></option>`).join('');
-
-    const headField = userSettings.headOfAccounts.inputType === 'dropdown'
-      ? `<select id="headOfAccounts">${(userSettings.headOfAccounts.options || []).map(opt => `<option value="${this.escapeHtml(opt)}">${this.escapeHtml(opt)}</option>`).join('')}</select>`
-      : `<input type="text" id="headOfAccounts" placeholder="হেড অফ একাউন্টস" list="headOfAccountsList"><datalist id="headOfAccountsList">${headOptions}</datalist>`;
-
-    const controlField = userSettings.controlAccount.mode === 'auto'
-      ? `<input type="text" id="controlAc" placeholder="অ্যাকাউন্ট" required readonly list="controlAcList"><datalist id="controlAcList">${controlOptions}</datalist>`
-      : `<input type="text" id="controlAc" placeholder="অ্যাকাউন্ট" required list="controlAcList"><datalist id="controlAcList">${controlOptions}</datalist>`;
 
     const formHTML = `
       <h2>নতুন ভাউচার এন্ট্রি</h2>
@@ -228,6 +371,9 @@ class VoucherApp {
           <div class="form-group">
             <label>যাকে দিতে হবে *</label>
             <input type="text" id="payTo" placeholder="নাম" required>
+            <div class="payee-description">
+              <input type="text" id="payeeDescription" placeholder="বিবরণ (ঐচ্ছিক)">
+            </div>
             <ul class="suggestions" id="payToSuggestions"></ul>
           </div>
           <div class="form-group">
@@ -240,11 +386,11 @@ class VoucherApp {
         <div class="form-row">
           <div class="form-group">
             <label>হেড অফ একাউন্টস</label>
-            ${headField}
+            <select id="headOfAccounts" class="select2-dropdown"></select>
           </div>
           <div class="form-group">
             <label>নিয়ন্ত্রণ অ্যাকাউন্ট *</label>
-            ${controlField}
+            <select id="controlAc" class="select2-dropdown" required></select>
             <ul class="suggestions" id="controlAcSuggestions"></ul>
           </div>
         </div>
@@ -252,11 +398,17 @@ class VoucherApp {
         <div class="form-row">
           <div class="form-group">
             <label>অ্যাকাউন্ট নম্বর</label>
-            <input type="text" id="accountNo" placeholder="অ্যাকাউন্ট নম্বর">
+            <select id="accountNo" class="select2-dropdown"></select>
           </div>
           <div class="form-group">
-            <label>ডিপোর নাম</label>
-            <input type="text" id="depotName" placeholder="ডিপোর নাম" value="${this.escapeHtml(userSettings.depotName || '')}">
+            <label>পেমেন্ট পদ্ধতি</label>
+            <select id="paymentMethod">
+              <option value="">নির্বাচন করুন</option>
+              <option value="নগদ">নগদ</option>
+              <option value="চেক">চেক</option>
+              <option value="ট্রান্সফার">ব্যাংক ট্রান্সফার</option>
+              <option value="ক্রেডিট কার্ড">ক্রেডিট কার্ড</option>
+            </select>
           </div>
         </div>
 
@@ -291,17 +443,6 @@ class VoucherApp {
           <div class="amount-words" id="amountWords"></div>
         </div>
 
-        <div class="form-group full-width">
-          <label>পেমেন্ট পদ্ধতি</label>
-          <select id="paymentMethod">
-            <option value="">নির্বাচন করুন</option>
-            <option value="নগদ">নগদ</option>
-            <option value="চেক">চেক</option>
-            <option value="ট্রান্সফার">ব্যাংক ট্রান্সফার</option>
-            <option value="ক্রেডিট কার্ড">ক্রেডিট কার্ড</option>
-          </select>
-        </div>
-
         <div class="form-actions">
           <button type="submit" class="btn-primary">সংরক্ষণ ও প্রিন্ট</button>
           <button type="button" class="btn-secondary" onclick="app.clearForm()">পরিষ্কার</button>
@@ -315,8 +456,13 @@ class VoucherApp {
     // Setup form listeners
     document.getElementById('voucherEntryForm').addEventListener('submit', (e) => this.handleVoucherSubmit(e));
 
+    // Initialize Select2 dropdowns after DOM is ready
+    setTimeout(() => {
+      this.initializeSelect2Dropdowns(userSettings);
+    }, 50);
+
     // Setup auto-suggestions
-    ['payTo', 'codeNo', 'controlAc'].forEach(field => {
+    ['payTo', 'codeNo'].forEach(field => {
       const input = document.getElementById(field);
       if (input && input.tagName === 'INPUT') {
         input.addEventListener('input', (e) => this.getSuggestions(field, e.target.value));
@@ -356,6 +502,92 @@ class VoucherApp {
     if (headInput && userSettings.headOfAccounts.defaultValue) {
       headInput.value = userSettings.headOfAccounts.defaultValue;
     }
+  }
+
+  initializeSelect2Dropdowns(userSettings) {
+    // Head of Accounts
+    const headSelect = $('#headOfAccounts');
+    if (headSelect.length) {
+      headSelect.select2({
+        data: (userSettings.headOfAccounts.options || []).map(opt => ({id: opt, text: opt})),
+        tags: true,
+        tokenSeparators: [','],
+        createTag: function (params) {
+          const term = $.trim(params.term);
+          if (term === '') return null;
+          return {id: term, text: term, newTag: true};
+        },
+        language: {
+          noResults: () => 'কোনো ফলাফল নেই',
+          searching: () => 'অনুসন্ধান করছি...'
+        }
+      });
+      if (userSettings.headOfAccounts.defaultValue) {
+        headSelect.val(userSettings.headOfAccounts.defaultValue).trigger('change');
+      }
+    }
+
+    // Control Account
+    const controlSelect = $('#controlAc');
+    if (controlSelect.length) {
+      controlSelect.select2({
+        data: (userSettings.controlAccount.options || []).map(opt => ({id: opt, text: opt})),
+        tags: true,
+        tokenSeparators: [','],
+        createTag: function (params) {
+          const term = $.trim(params.term);
+          if (term === '') return null;
+          return {id: term, text: term, newTag: true};
+        },
+        language: {
+          noResults: () => 'কোনো ফলাফল নেই',
+          searching: () => 'অনুসন্ধান করছি...'
+        }
+      });
+      if (userSettings.controlAccount.defaultValue) {
+        controlSelect.val(userSettings.controlAccount.defaultValue).trigger('change');
+      } else if (userSettings.controlAccount.mode === 'auto') {
+        controlSelect.val(userSettings.controlAccount.defaultValue || '').trigger('change');
+      }
+    }
+
+    // Account Number
+    const accountSelect = $('#accountNo');
+    if (accountSelect.length) {
+      // Assuming account numbers can be added dynamically
+      accountSelect.select2({
+        data: [
+          {id: 'ACC001', text: 'ACC001 - প্রধান অ্যাকাউন্ট'},
+          {id: 'ACC002', text: 'ACC002 - গৌণ অ্যাকাউন্ট'},
+          {id: 'ACC003', text: 'ACC003 - বিশেষ অ্যাকাউন্ট'}
+        ],
+        tags: true,
+        tokenSeparators: [','],
+        createTag: function (params) {
+          const term = $.trim(params.term);
+          if (term === '') return null;
+          return {id: term, text: term, newTag: true};
+        },
+        language: {
+          noResults: () => 'কোনো ফলাফল নেই',
+          searching: () => 'অনুসন্ধান করছি...'
+        }
+      });
+    }
+  }
+
+  newVoucherQuick() {
+    // Switch to voucher tab and clear form
+    switchTab('voucher');
+    this.clearForm();
+    // Focus on first field
+    setTimeout(() => {
+      const firstInput = document.getElementById('voucherNo');
+      if (firstInput) firstInput.focus();
+    }, 100);
+    
+    // Show notification
+    this.showNotification('নতুন ভাউচার', 'ফর্ম প্রস্তুত। এখন ভাউচার তথ্য প্রবেश করুন।', 'info');
   }
 
   async handleVoucherSubmit(e) {
@@ -415,6 +647,7 @@ class VoucherApp {
       date: document.getElementById('date').value,
       voucherNo: document.getElementById('voucherNo').value,
       payTo: document.getElementById('payTo').value,
+      payeeDescription: document.getElementById('payeeDescription')?.value || '',
       codeNo: document.getElementById('codeNo').value,
       controlAc: document.getElementById('controlAc').value,
       particulars: particulars,
@@ -438,7 +671,7 @@ class VoucherApp {
 
       const result = await response.json();
       result.voucher.headOfAccounts = document.getElementById('headOfAccounts')?.value || userSettings.headOfAccounts.defaultValue || '';
-      result.voucher.depotName = document.getElementById('depotName')?.value || userSettings.depotName || '';
+      result.voucher.payeeDescription = voucherData.payeeDescription;
       this.currentVoucher = result.voucher;
 
       // Show preview
@@ -685,13 +918,13 @@ class VoucherApp {
     const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0) || (parseFloat(voucher.amount) || 0);
     const publicId = voucher.publicId || voucher.public_id || '';
     const shareUrl = publicId ? `${window.location.origin}/v/${publicId}` : '';
-    const qrUrl = shareUrl
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=95x95&data=${encodeURIComponent(shareUrl)}`
-      : '';
     const qrEnabled = userSettings.publicUrl.enabled && userSettings.publicUrl.showQr && userSettings.qr.enabled;
-    const qrSize = Number(userSettings.qr.size) || 95;
+    const qrSize = Number(userSettings.qr.size) || 60;
     const qrX = Number(userSettings.qr.x) || 0;
     const qrY = Number(userSettings.qr.y) || 0;
+    const qrUrl = shareUrl
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(shareUrl)}`
+      : '';
     const dateParts = this.getDateParts(voucher.date);
 
     return `
@@ -1959,16 +2192,11 @@ class VoucherApp {
   }
 
   showError(message) {
-    const errorEl = document.getElementById('errorMessage');
-    errorEl.textContent = message;
-    errorEl.style.display = 'block';
-    setTimeout(() => {
-      errorEl.style.display = 'none';
-    }, 5000);
+    this.showNotification('ত্রুটি', message, 'error');
   }
 
   showMessage(message) {
-    alert(message);
+    this.showNotification('সফল', message, 'success');
   }
 
   escapeHtml(text) {
