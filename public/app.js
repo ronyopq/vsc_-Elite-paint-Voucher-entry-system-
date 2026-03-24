@@ -120,28 +120,28 @@ class VoucherApp {
           <div class="particulars-grid">
             <div class="particular-row">
               <input type="text" id="particular1" class="particular-input" placeholder="প্রথম বিবরণ" />
-              <input type="number" id="particularAmount1" class="particular-amount-input" placeholder="টাকা" step="0.01" min="0" />
+              <input type="text" id="particularAmount1" class="particular-amount-input" placeholder="টাকা (বাংলা/ইংরেজি সংখ্যা)" inputmode="decimal" />
             </div>
             <div class="particular-row">
               <input type="text" id="particular2" class="particular-input" placeholder="দ্বিতীয় বিবরণ" />
-              <input type="number" id="particularAmount2" class="particular-amount-input" placeholder="টাকা" step="0.01" min="0" />
+              <input type="text" id="particularAmount2" class="particular-amount-input" placeholder="টাকা (বাংলা/ইংরেজি সংখ্যা)" inputmode="decimal" />
             </div>
             <div class="particular-row">
               <input type="text" id="particular3" class="particular-input" placeholder="তৃতীয় বিবরণ" />
-              <input type="number" id="particularAmount3" class="particular-amount-input" placeholder="টাকা" step="0.01" min="0" />
+              <input type="text" id="particularAmount3" class="particular-amount-input" placeholder="টাকা (বাংলা/ইংরেজি সংখ্যা)" inputmode="decimal" />
             </div>
             <div class="particular-row">
               <input type="text" id="particular4" class="particular-input" placeholder="চতুর্থ বিবরণ" />
-              <input type="number" id="particularAmount4" class="particular-amount-input" placeholder="টাকা" step="0.01" min="0" />
+              <input type="text" id="particularAmount4" class="particular-amount-input" placeholder="টাকা (বাংলা/ইংরেজি সংখ্যা)" inputmode="decimal" />
             </div>
             <div class="particular-row">
               <input type="text" id="particular5" class="particular-input" placeholder="পঞ্চম বিবরণ" />
-              <input type="number" id="particularAmount5" class="particular-amount-input" placeholder="টাকা" step="0.01" min="0" />
+              <input type="text" id="particularAmount5" class="particular-amount-input" placeholder="টাকা (বাংলা/ইংরেজি সংখ্যা)" inputmode="decimal" />
             </div>
           </div>
           <div class="particular-total-row">
             <label for="amount">মোট টাকা *</label>
-            <input type="number" id="amount" placeholder="০" step="0.01" required readonly>
+            <input type="text" id="amount" placeholder="০.০০" required readonly>
           </div>
           <div class="amount-words" id="amountWords"></div>
         </div>
@@ -197,7 +197,7 @@ class VoucherApp {
     const rows = [];
     for (let i = 1; i <= 5; i += 1) {
       const text = (document.getElementById(`particular${i}`).value || '').trim();
-      const amount = parseFloat(document.getElementById(`particularAmount${i}`).value || '0') || 0;
+      const amount = this.parseLocalizedAmount(document.getElementById(`particularAmount${i}`).value || '0');
       if (text || amount > 0) {
         rows.push({ text, amount });
       }
@@ -344,16 +344,26 @@ class VoucherApp {
   updateParticularsTotal() {
     let total = 0;
     for (let i = 1; i <= 5; i += 1) {
-      const amount = parseFloat(document.getElementById(`particularAmount${i}`)?.value || '0') || 0;
+      const amount = this.parseLocalizedAmount(document.getElementById(`particularAmount${i}`)?.value || '0');
       total += amount;
     }
 
     const amountInput = document.getElementById('amount');
     if (amountInput) {
-      amountInput.value = total > 0 ? total.toFixed(2) : '';
+      amountInput.value = total > 0 ? this.formatAmount(total) : '';
     }
 
     this.updateAmountWords(total);
+  }
+
+  parseLocalizedAmount(value) {
+    if (value === null || value === undefined) return 0;
+    const normalized = String(value)
+      .replace(/[০-৯]/g, d => String('০১২৩৪৫৬৭৮৯'.indexOf(d)))
+      .replace(/,/g, '')
+      .trim();
+    const parsed = parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
   }
 
   numberToBanglaWords(num) {
@@ -450,7 +460,7 @@ class VoucherApp {
         const [text = '', amountRaw = '0'] = row.split('|||');
         rows.push({
           text: text.trim(),
-          amount: parseFloat(amountRaw || '0') || 0
+          amount: this.parseLocalizedAmount(amountRaw || '0')
         });
       });
     } else {
@@ -478,17 +488,19 @@ class VoucherApp {
     const qrUrl = shareUrl
       ? `https://api.qrserver.com/v1/create-qr-code/?size=95x95&data=${encodeURIComponent(shareUrl)}`
       : '';
+    const dateParts = this.getDateParts(voucher.date);
 
     return `
       <style>
         .voucher-memo {
-          width: 900px;
+          width: 8.3in;
+          min-height: 5.65in;
           background: white;
           background-image: url('/voucher-template.jpg');
           background-size: 100% 100%;
           background-repeat: no-repeat;
           font-family: Arial, sans-serif;
-          padding: 30px;
+          padding: 24px 28px;
           margin: 20px auto;
           box-shadow: 0 0 10px rgba(0,0,0,0.1);
           color: #000;
@@ -522,7 +534,7 @@ class VoucherApp {
         .header-info {
           text-align: right;
           font-size: 12px;
-          margin-top: 8px;
+          margin-top: 4px;
           margin-right: 110px;
         }
         .header-field {
@@ -538,6 +550,25 @@ class VoucherApp {
           display: inline-block;
           width: 150px;
           text-align: center;
+        }
+        .date-boxes {
+          display: inline-flex;
+          gap: 2px;
+          vertical-align: middle;
+        }
+        .date-box {
+          width: 36px;
+          height: 20px;
+          border: 1px solid #000;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: bold;
+          background: #fff;
+        }
+        .date-box.year {
+          width: 52px;
         }
         .memo-qr {
           position: absolute;
@@ -563,7 +594,7 @@ class VoucherApp {
           word-break: break-all;
         }
         .form-fields {
-          margin: 14px 0;
+          margin: 10px 0;
           font-size: 12px;
         }
         .form-row {
@@ -587,13 +618,13 @@ class VoucherApp {
         .memo-table {
           width: 100%;
           border-collapse: collapse;
-          margin: 18px 0;
+          margin: 12px 0;
           font-size: 12px;
         }
         .memo-table th,
         .memo-table td {
           border: 1px solid #000;
-          padding: 7px;
+          padding: 5px 6px;
         }
         .memo-table th {
           text-align: center;
@@ -601,14 +632,14 @@ class VoucherApp {
           background: #f8f8f8;
         }
         .particulars-col {
-          width: 60%;
+          width: 70%;
         }
         .taka-col {
-          width: 20%;
+          width: 26%;
           text-align: right;
         }
         .ps-col {
-          width: 20%;
+          width: 4%;
           text-align: center;
         }
         .total-label {
@@ -622,7 +653,7 @@ class VoucherApp {
         .footer-signatures {
           display: flex;
           justify-content: space-around;
-          margin-top: 34px;
+          margin-top: 24px;
         }
         .sig-item {
           width: 130px;
@@ -658,7 +689,11 @@ class VoucherApp {
           </div>
           <div class="header-field">
             <span class="field-label">Date</span>
-            <span class="field-value">${this.formatVoucherDate(voucher.date)}</span>
+            <span class="date-boxes">
+              <span class="date-box">${dateParts.day}</span>
+              <span class="date-box">${dateParts.month}</span>
+              <span class="date-box year">${dateParts.year}</span>
+            </span>
           </div>
         </div>
 
@@ -738,15 +773,33 @@ class VoucherApp {
     `;
   }
 
-  formatVoucherDate(dateStr) {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${d.getDate()}-${months[d.getMonth()]}-${d.getFullYear()}`;
+  formatAmount(amount) {
+    const value = parseFloat(amount) || 0;
+    return value.toLocaleString('bn-BD', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   }
 
-  formatAmount(amount) {
-    return (parseFloat(amount) || 0).toFixed(2);
+  getDateParts(dateStr) {
+    if (!dateStr) {
+      return { day: '', month: '', year: '' };
+    }
+
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) {
+      return { day: '', month: '', year: '' };
+    }
+
+    return {
+      day: this.toBanglaDigits(String(d.getDate()).padStart(2, '0')),
+      month: this.toBanglaDigits(String(d.getMonth() + 1).padStart(2, '0')),
+      year: this.toBanglaDigits(String(d.getFullYear()))
+    };
+  }
+
+  toBanglaDigits(value) {
+    return String(value).replace(/[0-9]/g, d => '০১২৩৪৫৬৭৮৯'[Number(d)]);
   }
 
   printVoucher(voucher) {
@@ -769,9 +822,10 @@ class VoucherApp {
   <meta charset="UTF-8">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    @page { size: A4; margin: 10mm; }
-    body { margin: 0; padding: 0; background: white; }
-    .voucher-memo { box-shadow: none !important; margin: 0 auto !important; }
+    @page { size: 8.3in 5.65in; margin: 0; }
+    html, body { margin: 0; padding: 0; background: white; }
+    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .voucher-memo { box-shadow: none !important; margin: 0 !important; }
   </style>
 </head>
 <body>
