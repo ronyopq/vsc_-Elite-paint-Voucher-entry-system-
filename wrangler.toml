@@ -29,3 +29,6 @@ id = "4bcaacd9dc3f47da8e35741dde84f464"
 [[kv_namespaces]]
 binding = "KV_PUBLIC_CACHE"
 id = "4cb1cdca7ccd46fdbbd96c3228ba1234"
+
+[triggers]
+crons = ["15 0 1 * *"]

@@ -264,6 +264,14 @@ class AdminApp {
 
   loadSettingsSection() {
     const content = document.getElementById('settingsContent');
+    const reportControls = this.user.role === 'super_admin' ? `
+      <hr style="margin: 20px 0; border: 0; border-top: 1px solid #e1e7f0;">
+      <h3 style="margin-bottom: 12px;">মাসিক রিপোর্ট অটোমেশন</h3>
+      <p style="margin-bottom: 10px; color: #49596e;">Cron schedule: প্রতি মাসের ১ তারিখ 00:15 UTC এ অটো রান হবে।</p>
+      <button class="btn btn-primary" onclick="adminApp.runMonthlyReportNow()">এখনই Monthly Report Run করুন</button>
+      <div id="monthlyRunResult" style="margin-top: 12px; color: #324865;"></div>
+    ` : '';
+
     const html = `
       <div class="form-group">
         <label>গ্লোবাল প্রিন্ট অফসেট X (পিক্সেল)</label>
@@ -278,9 +286,32 @@ class AdminApp {
         <input type="number" id="fontScale" value="100">
       </div>
       <button class="btn btn-primary" onclick="adminApp.saveSettings()">সংরক্ষণ করুন</button>
+      ${reportControls}
     `;
 
     content.innerHTML = html;
+  }
+
+  async runMonthlyReportNow() {
+    try {
+      const response = await fetch(`${this.apiBase}/api/admin/reports/run-monthly`, {
+        method: 'POST'
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data.error || 'Monthly report run ব্যর্থ');
+        return;
+      }
+
+      const result = data.result || {};
+      const box = document.getElementById('monthlyRunResult');
+      if (box) {
+        box.textContent = `মাস: ${result.monthKey || '-'} | মোট ইউজার: ${result.totalUsers || 0} | generated: ${result.generated || 0} | cached: ${result.cached || 0} | failed: ${result.failed || 0}`;
+      }
+    } catch (error) {
+      console.error('Run monthly report error:', error);
+      alert('Monthly report run করা যায়নি');
+    }
   }
 
   async saveSettings() {

@@ -7,7 +7,7 @@ import { generateId, generatePublicId, getLocalDateString } from '../shared/util
 
 // Import route handlers
 import { handleAuthLogin, handleAuthCallback, handleAuthLogout, handleAuthUser, handleLocalLogin } from '../functions/auth.js';
-import { handleVoucherCreate, handleVoucherGet, handleVoucherGetAll, handleVoucherWorkflowUpdate, handleVoucherVerify, handleVoucherPublic, handleVoucherUpdate, handleVoucherAuditTrail, handleApprovalQueue, handleEmailNotifications, handleVoucherSoftDelete, handleExportBackup, handleMonthlyAutoReport } from '../functions/voucher.js';
+import { handleVoucherCreate, handleVoucherGet, handleVoucherGetAll, handleVoucherWorkflowUpdate, handleVoucherVerify, handleVoucherPublic, handleVoucherUpdate, handleVoucherAuditTrail, handleApprovalQueue, handleEmailNotifications, handleVoucherSoftDelete, handleExportBackup, handleMonthlyAutoReport, handleMonthlyAutoReportCron } from '../functions/voucher.js';
 import { handleSuggestGet, handleSuggestAdd } from '../functions/suggest.js';
 import { handleAdminUsers, handleAdminBlock, handleAdminExtendTrial, handleAdminLoginAs, handleAdminCreateUser, handleAdminSetLimits } from '../functions/admin.js';
 
@@ -121,6 +121,15 @@ export default {
 
           if (action === 'users' && request.method === 'GET') {
             return handleAdminUsers(request, db, sessionManager);
+          } else if (action === 'reports' && apiSubpath[1] === 'run-monthly' && request.method === 'POST') {
+            const [session, authError] = await requireSuperAdmin(request, sessionManager);
+            if (authError) return authError;
+            const result = await handleMonthlyAutoReportCron(db);
+            await db.logAction(session.userId, 'monthly_report_cron_manual_run', 'report', result.monthKey, JSON.stringify(result));
+            return new Response(JSON.stringify({ success: true, result }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' }
+            });
           } else if (action === 'user' && apiSubpath[1] === 'create' && request.method === 'POST') {
             return handleAdminCreateUser(request, db, sessionManager);
           } else if (action === 'user' && apiSubpath[1] === 'set-limits' && request.method === 'POST') {
@@ -185,6 +194,16 @@ export default {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       });
+    }
+  }
+,
+  async scheduled(controller, env, context) {
+    const db = new Database(env.DB);
+    try {
+      const result = await handleMonthlyAutoReportCron(db);
+      await db.logAction(null, 'monthly_report_cron_run', 'report', result.monthKey, JSON.stringify(result));
+    } catch (error) {
+      await db.logAction(null, 'monthly_report_cron_failed', 'report', 'cron', JSON.stringify({ message: error.message || 'unknown' }));
     }
   }
 };

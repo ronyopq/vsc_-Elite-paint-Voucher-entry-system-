@@ -25,6 +25,60 @@ function isVoucherSoftDeleted(registry, voucherId) {
   return Boolean(registry && registry[voucherId] && registry[voucherId].deletedAt);
 }
 
+function getMonthKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getPreviousMonthKey(date = new Date()) {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() - 1);
+  return getMonthKey(d);
+}
+
+async function buildOrGetMonthlyReport(db, userId, monthKey, { force = false, actorId = null } = {}) {
+  const reportSettingKey = `monthly_auto_report:${userId}:${monthKey}`;
+
+  if (!force) {
+    const existing = await db.getSetting(reportSettingKey);
+    if (existing) {
+      return { report: JSON.parse(existing), cached: true };
+    }
+  }
+
+  const vouchersRaw = await db.getUserVouchers(userId, 10000, 0);
+  const allVouchers = vouchersRaw.results || [];
+  const softDeleteRegistry = await getSoftDeleteRegistry(db);
+
+  const monthlyRows = allVouchers.filter((v) => {
+    if (isVoucherSoftDeleted(softDeleteRegistry, v.id)) return false;
+    const d = String(v.date || '');
+    return d.startsWith(`${monthKey}-`) || d.startsWith(monthKey);
+  });
+
+  const totalAmount = monthlyRows.reduce((sum, v) => sum + (parseFloat(v.amount) || 0), 0);
+  const byPayee = {};
+  monthlyRows.forEach((v) => {
+    const key = String(v.pay_to || 'Unknown').trim() || 'Unknown';
+    if (!byPayee[key]) byPayee[key] = { name: key, count: 0, total: 0 };
+    byPayee[key].count += 1;
+    byPayee[key].total += parseFloat(v.amount) || 0;
+  });
+
+  const report = {
+    month: monthKey,
+    generatedAt: new Date().toISOString(),
+    totalVouchers: monthlyRows.length,
+    totalAmount,
+    approvedVouchers: monthlyRows.length,
+    topPayees: Object.values(byPayee).sort((a, b) => b.total - a.total).slice(0, 10)
+  };
+
+  await db.setSetting(reportSettingKey, JSON.stringify(report), actorId || userId);
+  await db.logAction(actorId || userId, 'monthly_report_generated', 'report', `${userId}:${monthKey}`, JSON.stringify(report));
+
+  return { report, cached: false };
+}
+
 async function getUserLimitConfig(db, userId) {
   try {
     const raw = await db.getSetting(`user_limits:${userId}`);
@@ -632,53 +686,11 @@ export async function handleMonthlyAutoReport(request, db, sessionManager) {
 
   try {
     const url = new URL(request.url);
-    const now = new Date();
-    const monthKey = url.searchParams.get('month') || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const reportSettingKey = `monthly_auto_report:${session.userId}:${monthKey}`;
+    const monthKey = url.searchParams.get('month') || getMonthKey(new Date());
+    const force = (url.searchParams.get('force') || '').toLowerCase() === 'true';
+    const result = await buildOrGetMonthlyReport(db, session.userId, monthKey, { force, actorId: session.userId });
 
-    const existing = await db.getSetting(reportSettingKey);
-    if (existing) {
-      return new Response(JSON.stringify({
-        report: JSON.parse(existing),
-        cached: true
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    const vouchersRaw = await db.getUserVouchers(session.userId, 10000, 0);
-    const allVouchers = vouchersRaw.results || [];
-    const softDeleteRegistry = await getSoftDeleteRegistry(db);
-
-    const monthlyRows = allVouchers.filter((v) => {
-      if (isVoucherSoftDeleted(softDeleteRegistry, v.id)) return false;
-      const d = String(v.date || '');
-      return d.startsWith(`${monthKey}-`) || d.startsWith(monthKey);
-    });
-
-    const totalAmount = monthlyRows.reduce((sum, v) => sum + (parseFloat(v.amount) || 0), 0);
-    const byPayee = {};
-    monthlyRows.forEach((v) => {
-      const key = String(v.pay_to || 'Unknown').trim() || 'Unknown';
-      if (!byPayee[key]) byPayee[key] = { name: key, count: 0, total: 0 };
-      byPayee[key].count += 1;
-      byPayee[key].total += parseFloat(v.amount) || 0;
-    });
-
-    const report = {
-      month: monthKey,
-      generatedAt: new Date().toISOString(),
-      totalVouchers: monthlyRows.length,
-      totalAmount,
-      approvedVouchers: monthlyRows.length,
-      topPayees: Object.values(byPayee).sort((a, b) => b.total - a.total).slice(0, 10)
-    };
-
-    await db.setSetting(reportSettingKey, JSON.stringify(report), session.userId);
-    await db.logAction(session.userId, 'monthly_report_generated', 'report', monthKey, JSON.stringify(report));
-
-    return new Response(JSON.stringify({ report, cached: false }), {
+    return new Response(JSON.stringify(result), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -689,6 +701,29 @@ export async function handleMonthlyAutoReport(request, db, sessionManager) {
       headers: { 'Content-Type': 'application/json' }
     });
   }
+}
+
+export async function handleMonthlyAutoReportCron(db) {
+  const usersRaw = await db.getAllUsers(10000, 0);
+  const users = usersRaw.results || usersRaw || [];
+  const monthKey = getPreviousMonthKey(new Date());
+
+  const activeUsers = users.filter((u) => !u.is_blocked);
+  let generated = 0;
+  let cached = 0;
+  let failed = 0;
+
+  for (const user of activeUsers) {
+    try {
+      const result = await buildOrGetMonthlyReport(db, user.id, monthKey, { force: false, actorId: user.id });
+      if (result.cached) cached += 1;
+      else generated += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+
+  return { monthKey, totalUsers: activeUsers.length, generated, cached, failed };
 }
 
 export async function handleVoucherVerify(request, db, publicId) {
