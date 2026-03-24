@@ -101,7 +101,7 @@ class VoucherApp {
       },
       qr: {
         enabled: true,
-        size: 60,
+        size: 40,
         x: 0,
         y: 0
       },
@@ -187,13 +187,14 @@ class VoucherApp {
     return maxFound + 1;
   }
 
-  // Bengali Number-to-Word Converter (Indian Format)
+  // Bengali Number-to-Word Converter (Indian Format) - Corrected
   convertNumberToBengaliWords(num) {
     if (num === 0) return 'শূন্য';
     
     const ones = ['', 'এক', 'দুই', 'তিন', 'চার', 'পাঁচ', 'ছয়', 'সাত', 'আট', 'নয়'];
     const teens = ['দশ', 'এগার', 'বার', 'তের', 'চৌদ্দ', 'পনের', 'ষোল', 'সতের', 'আঠার', 'উনিশ'];
     const tens = ['', '', 'বিশ', 'ত্রিশ', 'চল্লিশ', 'পঞ্চাশ', 'ষাট', 'সত্তর', 'আশি', 'নব্বই'];
+    const onesSuffix = ['', 'া', 'া', 'া', 'া', 'া', 'া', 'া', 'া', 'া'];
     const scales = [
       { name: 'কোটি', value: 10000000 },
       { name: 'লক্ষ', value: 100000 },
@@ -208,13 +209,22 @@ class VoucherApp {
         result += ones[hundred] + ' শত ';
       }
       const remainder = n % 100;
-      if (remainder >= 10 && remainder < 20) {
+      if (remainder === 0) {
+        return result.trim();
+      } else if (remainder >= 10 && remainder < 20) {
         result += teens[remainder - 10] + ' ';
       } else {
         const ten = Math.floor(remainder / 10);
         const one = remainder % 10;
-        if (ten > 0) result += tens[ten] + ' ';
-        if (one > 0) result += ones[one] + ' ';
+        if (ten >= 2) {
+          if (one > 0) {
+            result += ones[one] + 'া' + tens[ten] + ' ';
+          } else {
+            result += tens[ten] + ' ';
+          }
+        } else if (one > 0) {
+          result += ones[one] + ' ';
+        }
       }
       return result.trim();
     };
@@ -371,9 +381,6 @@ class VoucherApp {
           <div class="form-group">
             <label>যাকে দিতে হবে *</label>
             <input type="text" id="payTo" placeholder="নাম" required>
-            <div class="payee-description">
-              <input type="text" id="payeeDescription" placeholder="বিবরণ (ঐচ্ছিক)">
-            </div>
             <ul class="suggestions" id="payToSuggestions"></ul>
           </div>
           <div class="form-group">
@@ -386,11 +393,11 @@ class VoucherApp {
         <div class="form-row">
           <div class="form-group">
             <label>হেড অফ একাউন্টস</label>
-            <select id="headOfAccounts" class="select2-dropdown"></select>
+            <select id="headOfAccounts" class="select2-editable" data-tags="true"></select>
           </div>
           <div class="form-group">
             <label>নিয়ন্ত্রণ অ্যাকাউন্ট *</label>
-            <select id="controlAc" class="select2-dropdown" required></select>
+            <select id="controlAc" class="select2-editable" data-tags="true" required></select>
             <ul class="suggestions" id="controlAcSuggestions"></ul>
           </div>
         </div>
@@ -398,7 +405,7 @@ class VoucherApp {
         <div class="form-row">
           <div class="form-group">
             <label>অ্যাকাউন্ট নম্বর</label>
-            <select id="accountNo" class="select2-dropdown"></select>
+            <select id="accountNo" class="select2-editable" data-tags="true"></select>
           </div>
           <div class="form-group">
             <label>পেমেন্ট পদ্ধতি</label>
@@ -413,7 +420,18 @@ class VoucherApp {
         </div>
 
         <div class="form-group full-width">
-          <label>বিবরণ (বিশেষ তথ্য) *</label>
+          <div class="form-row">
+            <div class="form-group">
+              <label>বিবরণ (বিশেষ তথ্য) *</label>
+              <select id="particularsDropdown" class="select2-editable" data-tags="true">
+                <option value="">কাস্টম বর্ণনা...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>&nbsp;</label>
+              <button type="button" class="btn-secondary" onclick="app.addParticularsFromDropdown()">যোগ করুন</button>
+            </div>
+          </div>
           <div class="particulars-grid">
             <div class="particular-row">
               <input type="text" id="particular1" class="particular-input" placeholder="প্রথম বিবরণ" />
@@ -554,13 +572,8 @@ class VoucherApp {
     // Account Number
     const accountSelect = $('#accountNo');
     if (accountSelect.length) {
-      // Assuming account numbers can be added dynamically
       accountSelect.select2({
-        data: [
-          {id: 'ACC001', text: 'ACC001 - প্রধান অ্যাকাউন্ট'},
-          {id: 'ACC002', text: 'ACC002 - গৌণ অ্যাকাউন্ট'},
-          {id: 'ACC003', text: 'ACC003 - বিশেষ অ্যাকাউন্ট'}
-        ],
+        data: [],
         tags: true,
         tokenSeparators: [','],
         createTag: function (params) {
@@ -574,6 +587,54 @@ class VoucherApp {
         }
       });
     }
+
+    // Particulars Dropdown - Load saved particulars
+    const particularsSelect = $('#particularsDropdown');
+    if (particularsSelect.length) {
+      const savedParticulars = JSON.parse(localStorage.getItem('savedParticulars') || '[]');
+      const particularsData = savedParticulars.map(p => ({id: p, text: p}));
+      particularsSelect.select2({
+        data: particularsData,
+        tags: true,
+        tokenSeparators: [','],
+        createTag: function (params) {
+          const term = $.trim(params.term);
+          if (term === '') return null;
+          return {id: term, text: term, newTag: true};
+        },
+        language: {
+          noResults: () => 'কোনো ফলাফল নেই',
+          searching: () => 'অনুসন্ধান করছি...'
+        }
+      });
+    }
+  }
+
+  addParticularsFromDropdown() {
+    const selectedParticulars = $('#particularsDropdown').val();
+    if (!selectedParticulars) {
+      this.showError('একটি বিবরণ নির্বাচন করুন');
+      return;
+    }
+
+    // Find the next empty particulars row
+    for (let i = 1; i <= 5; i++) {
+      const textField = document.getElementById(`particular${i}`);
+      if (textField && !textField.value) {
+        textField.value = selectedParticulars;
+        break;
+      }
+    }
+
+    // Save to localStorage for future use
+    const savedParticulars = JSON.parse(localStorage.getItem('savedParticulars') || '[]');
+    if (!savedParticulars.includes(selectedParticulars)) {
+      savedParticulars.push(selectedParticulars);
+      localStorage.setItem('savedParticulars', JSON.stringify(savedParticulars));
+    }
+
+    // Clear dropdown
+    $('#particularsDropdown').val('').trigger('change');
   }
 
   newVoucherQuick() {
@@ -647,7 +708,6 @@ class VoucherApp {
       date: document.getElementById('date').value,
       voucherNo: document.getElementById('voucherNo').value,
       payTo: document.getElementById('payTo').value,
-      payeeDescription: document.getElementById('payeeDescription')?.value || '',
       codeNo: document.getElementById('codeNo').value,
       controlAc: document.getElementById('controlAc').value,
       particulars: particulars,
@@ -671,7 +731,6 @@ class VoucherApp {
 
       const result = await response.json();
       result.voucher.headOfAccounts = document.getElementById('headOfAccounts')?.value || userSettings.headOfAccounts.defaultValue || '';
-      result.voucher.payeeDescription = voucherData.payeeDescription;
       this.currentVoucher = result.voucher;
 
       // Show preview

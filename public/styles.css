@@ -784,22 +784,6 @@ h3 {
   top: 48px !important;
 }
 
-/* Payee Description Support */
-.payee-description {
-  margin-top: 8px;
-  display: flex;
-  gap: 8px;
-}
-
-.payee-description input {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #5b6b82;
-}
-
 /* Print/PDF Modal Buttons */
 .modal-print-actions {
   display: flex;
@@ -842,6 +826,6 @@ h3 {
 
 /* QR Code Size Reduction */
 .memo-qr {
-  width: 60px !important;
-  height: 60px !important;
+  width: 40px !important;
+  height: 40px !important;
 }
