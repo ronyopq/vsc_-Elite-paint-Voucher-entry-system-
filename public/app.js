@@ -8,6 +8,13 @@ class VoucherApp {
     this.voucherHistory = [];
     this.apiBase = '';
     this.historyFilter = '';
+    this.historyAdvanced = {
+      status: '',
+      dateFrom: '',
+      dateTo: '',
+      amountMin: '',
+      amountMax: ''
+    };
     this.init();
   }
 
@@ -1459,6 +1466,30 @@ class VoucherApp {
     const settings = this.getUserSettings();
     const query = this.historyFilter.trim().toLowerCase();
     const filteredVouchers = this.voucherHistory.filter((v) => {
+      const status = this.getWorkflowStatus(v).className;
+      const vDate = String(v.date || '');
+      const amount = parseFloat(v.amount) || 0;
+
+      if (this.historyAdvanced.status && status !== this.historyAdvanced.status) {
+        return false;
+      }
+
+      if (this.historyAdvanced.dateFrom && vDate < this.historyAdvanced.dateFrom) {
+        return false;
+      }
+
+      if (this.historyAdvanced.dateTo && vDate > this.historyAdvanced.dateTo) {
+        return false;
+      }
+
+      if (this.historyAdvanced.amountMin !== '' && amount < (parseFloat(this.historyAdvanced.amountMin) || 0)) {
+        return false;
+      }
+
+      if (this.historyAdvanced.amountMax !== '' && amount > (parseFloat(this.historyAdvanced.amountMax) || Number.MAX_SAFE_INTEGER)) {
+        return false;
+      }
+
       if (!query) return true;
       const text = `${v.voucher_no || ''} ${v.pay_to || ''} ${v.control_ac || ''} ${v.code_no || ''}`.toLowerCase();
       return text.includes(query);
@@ -1468,9 +1499,23 @@ class VoucherApp {
       <h2>ভাউচার ইতিহাস</h2>
       <div class="history-toolbar">
         <input type="text" id="historySearch" class="history-search" placeholder="নম্বর/নাম দিয়ে খুঁজুন..." value="${this.escapeHtml(this.historyFilter)}" oninput="app.setHistoryFilter(this.value)">
+        <select onchange="app.setHistoryAdvancedFilter('status', this.value)">
+          <option value="">সব স্ট্যাটাস</option>
+          <option value="draft" ${this.historyAdvanced.status === 'draft' ? 'selected' : ''}>ড্রাফট</option>
+          <option value="prepared" ${this.historyAdvanced.status === 'prepared' ? 'selected' : ''}>প্রস্তুত</option>
+          <option value="verified" ${this.historyAdvanced.status === 'verified' ? 'selected' : ''}>যাচাইকৃত</option>
+          <option value="recommended" ${this.historyAdvanced.status === 'recommended' ? 'selected' : ''}>সুপারিশকৃত</option>
+          <option value="approved" ${this.historyAdvanced.status === 'approved' ? 'selected' : ''}>অনুমোদিত</option>
+        </select>
+        <input type="date" value="${this.escapeHtml(this.historyAdvanced.dateFrom)}" onchange="app.setHistoryAdvancedFilter('dateFrom', this.value)">
+        <input type="date" value="${this.escapeHtml(this.historyAdvanced.dateTo)}" onchange="app.setHistoryAdvancedFilter('dateTo', this.value)">
+        <input type="number" min="0" step="0.01" placeholder="সর্বনিম্ন টাকা" value="${this.escapeHtml(String(this.historyAdvanced.amountMin || ''))}" onchange="app.setHistoryAdvancedFilter('amountMin', this.value)">
+        <input type="number" min="0" step="0.01" placeholder="সর্বোচ্চ টাকা" value="${this.escapeHtml(String(this.historyAdvanced.amountMax || ''))}" onchange="app.setHistoryAdvancedFilter('amountMax', this.value)">
+        <button class="btn-secondary" onclick="app.clearHistoryFilters()">ফিল্টার রিসেট</button>
         <button class="btn-secondary" onclick="app.exportVouchersCSV()">CSV Export</button>
         <button class="btn-secondary" onclick="app.exportVouchersJSON()">JSON Export</button>
       </div>
+      <p class="history-meta">দেখানো হচ্ছে ${filteredVouchers.length} / ${this.voucherHistory.length} টি ভাউচার</p>
       <table class="history-table">
         <thead>
           <tr>
@@ -1508,9 +1553,14 @@ class VoucherApp {
   async loadReports() {
     document.getElementById('reports').innerHTML = `
       <h2>রিপোর্ট</h2>
+      <div id="reportSummaryCards" class="report-cards"></div>
       <div class="report-section">
         <h3>এই মাসের সারাংশ</h3>
         <div id="monthlyStats"></div>
+      </div>
+      <div class="report-section">
+        <h3>Top Payee (এই মাস)</h3>
+        <div id="topPayees"></div>
       </div>
       <div class="report-section">
         <h3>প্রতিটি সপ্তাহ</h3>
@@ -1529,6 +1579,29 @@ class VoucherApp {
       const budget = this.getBudgetSettings();
       const monthSpent = this.getCurrentMonthSpent();
       const remaining = budget.monthlyLimit > 0 ? (budget.monthlyLimit - monthSpent) : 0;
+      const pendingCount = this.voucherHistory.filter((v) => !v.approved_by).length;
+      const approvedCount = this.voucherHistory.filter((v) => !!v.approved_by).length;
+      const avgAmount = (stats.total || 0) > 0 ? ((stats.total_amount || 0) / stats.total) : 0;
+
+      document.getElementById('reportSummaryCards').innerHTML = `
+        <div class="report-card">
+          <div class="report-card-title">মোট ভাউচার</div>
+          <div class="report-card-value">${stats.total || 0}</div>
+        </div>
+        <div class="report-card">
+          <div class="report-card-title">Pending</div>
+          <div class="report-card-value">${pendingCount}</div>
+        </div>
+        <div class="report-card">
+          <div class="report-card-title">Approved</div>
+          <div class="report-card-value">${approvedCount}</div>
+        </div>
+        <div class="report-card">
+          <div class="report-card-title">গড় ভাউচার পরিমাণ</div>
+          <div class="report-card-value">${this.formatAmount(avgAmount)} টাকা</div>
+        </div>
+      `;
+
       document.getElementById('monthlyStats').innerHTML = `
         <p>মোট ভাউচার: ${stats.total || 0}</p>
         <p>মোট পরিমাণ: ${(stats.total_amount || 0).toLocaleString('bn-BD')} টাকা</p>
@@ -1536,6 +1609,10 @@ class VoucherApp {
         <p>মাসিক বাজেট: ${budget.monthlyLimit > 0 ? this.formatAmount(budget.monthlyLimit) : 'সেট করা নেই'} </p>
         <p>বাজেট অবশিষ্ট: ${budget.monthlyLimit > 0 ? this.formatAmount(remaining) : 'N/A'} </p>
       `;
+
+      document.getElementById('topPayees').innerHTML = this.getTopPayeesThisMonth().length
+        ? this.getTopPayeesThisMonth().map((p) => `<p>${this.escapeHtml(p.name)}: ${p.count} টি, ${this.formatAmount(p.total)} টাকা</p>`).join('')
+        : '<p>কোন ডাটা নেই</p>';
 
       document.getElementById('weeklyStats').innerHTML = weekly.length
         ? weekly.map((w) => `<p>${w.label}: ${w.count} টি, ${this.formatAmount(w.total)} টাকা</p>`).join('')
@@ -1846,6 +1923,48 @@ class VoucherApp {
   setHistoryFilter(value) {
     this.historyFilter = value || '';
     this.displayVoucherHistory();
+  }
+
+  setHistoryAdvancedFilter(key, value) {
+    if (!Object.prototype.hasOwnProperty.call(this.historyAdvanced, key)) return;
+    this.historyAdvanced[key] = value || '';
+    this.displayVoucherHistory();
+  }
+
+  clearHistoryFilters() {
+    this.historyFilter = '';
+    this.historyAdvanced = {
+      status: '',
+      dateFrom: '',
+      dateTo: '',
+      amountMin: '',
+      amountMax: ''
+    };
+    this.displayVoucherHistory();
+  }
+
+  getTopPayeesThisMonth() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const map = new Map();
+
+    this.voucherHistory.forEach((v) => {
+      const d = new Date(v.date);
+      if (Number.isNaN(d.getTime()) || d.getFullYear() !== y || d.getMonth() !== m) return;
+      const name = String(v.pay_to || 'Unknown').trim() || 'Unknown';
+      const amount = parseFloat(v.amount) || 0;
+      if (!map.has(name)) {
+        map.set(name, { name, count: 0, total: 0 });
+      }
+      const item = map.get(name);
+      item.count += 1;
+      item.total += amount;
+    });
+
+    return Array.from(map.values())
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
   }
 
   getWorkflowStatus(voucher) {

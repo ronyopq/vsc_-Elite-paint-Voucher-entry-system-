@@ -349,6 +349,12 @@ h3 {
   flex-wrap: wrap;
 }
 
+.history-meta {
+  color: #4a617f;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
 .history-search {
   min-width: 260px;
   max-width: 360px;
@@ -449,6 +455,34 @@ h3 {
   background: linear-gradient(140deg, #f7fbff 0%, #f0f7ff 100%);
   border-radius: 12px;
   border: 1px solid #dbe6f2;
+}
+
+.report-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.report-card {
+  background: linear-gradient(160deg, #ffffff 0%, #f3f8ff 100%);
+  border: 1px solid #d8e4f2;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.report-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4c6180;
+  margin-bottom: 6px;
+}
+
+.report-card-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #123a62;
+  letter-spacing: -0.2px;
 }
 
 .report-section h3 {
@@ -555,7 +589,7 @@ h3 {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.4);
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   z-index: 9999;
