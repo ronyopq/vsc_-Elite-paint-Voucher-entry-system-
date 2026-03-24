@@ -240,6 +240,19 @@ class VoucherApp {
       }
     }
 
+    const budgetSettings = this.getBudgetSettings();
+    if (budgetSettings.monthlyLimit > 0) {
+      const currentMonthSpent = this.getCurrentMonthSpent();
+      const projected = currentMonthSpent + totalAmount;
+      if (projected > budgetSettings.monthlyLimit) {
+        const overBy = projected - budgetSettings.monthlyLimit;
+        const proceed = confirm(`মাসিক বাজেট ছাড়িয়ে যাবে। সীমা: ${this.formatAmount(budgetSettings.monthlyLimit)} টাকা, অতিরিক্ত: ${this.formatAmount(overBy)} টাকা। তবুও সংরক্ষণ করবেন?`);
+        if (!proceed) {
+          return;
+        }
+      }
+    }
+
     const voucherData = {
       date: document.getElementById('date').value,
       voucherNo: document.getElementById('voucherNo').value,
@@ -1005,10 +1018,8 @@ class VoucherApp {
               <td>
                 <button onclick="app.viewVoucher('${v.id}')" class="btn-small">দেখুন</button>
                 <button onclick="app.shareVoucher('${v.public_id}')" class="btn-small">শেয়ার</button>
-                <button onclick="app.updateVoucherWorkflow('${v.id}', 'prepared')" class="btn-small">প্রস্তুত</button>
-                <button onclick="app.updateVoucherWorkflow('${v.id}', 'verified')" class="btn-small">যাচাই</button>
-                <button onclick="app.updateVoucherWorkflow('${v.id}', 'recommended')" class="btn-small">সুপারিশ</button>
-                <button onclick="app.updateVoucherWorkflow('${v.id}', 'approved')" class="btn-small">অনুমোদন</button>
+                <button onclick="app.copyVerifyLink('${v.public_id}')" class="btn-small">Verify Link</button>
+                ${this.renderWorkflowActionButtons(v)}
               </td>
             </tr>
           `).join('')}
@@ -1030,20 +1041,32 @@ class VoucherApp {
         <h3>প্রতিটি সপ্তাহ</h3>
         <div id="weeklyStats"></div>
       </div>
+      <div class="report-section">
+        <h3>ব্যাংক রিকনসিলিয়েশন</h3>
+        <div id="bankReconciliation"></div>
+      </div>
     `;
 
     try {
       // Load stats from DB
       const stats = await this.getUserStats();
       const weekly = this.getWeeklyStats(this.voucherHistory);
+      const budget = this.getBudgetSettings();
+      const monthSpent = this.getCurrentMonthSpent();
+      const remaining = budget.monthlyLimit > 0 ? (budget.monthlyLimit - monthSpent) : 0;
       document.getElementById('monthlyStats').innerHTML = `
         <p>মোট ভাউচার: ${stats.total || 0}</p>
         <p>মোট পরিমাণ: ${(stats.total_amount || 0).toLocaleString('bn-BD')} টাকা</p>
+        <p>এই মাসে খরচ: ${this.formatAmount(monthSpent)} টাকা</p>
+        <p>মাসিক বাজেট: ${budget.monthlyLimit > 0 ? this.formatAmount(budget.monthlyLimit) : 'সেট করা নেই'} </p>
+        <p>বাজেট অবশিষ্ট: ${budget.monthlyLimit > 0 ? this.formatAmount(remaining) : 'N/A'} </p>
       `;
 
       document.getElementById('weeklyStats').innerHTML = weekly.length
         ? weekly.map((w) => `<p>${w.label}: ${w.count} টি, ${this.formatAmount(w.total)} টাকা</p>`).join('')
         : '<p>কোন ডাটা নেই</p>';
+
+      document.getElementById('bankReconciliation').innerHTML = this.renderBankReconciliation();
     } catch (error) {
       console.error('Load reports error:', error);
     }
@@ -1079,10 +1102,22 @@ class VoucherApp {
           <button class="btn-secondary" onclick="app.resetPrintCalibration()">রিসেট</button>
         </div>
       </div>
+      <div class="settings-section">
+        <h3>বাজেট নিয়ন্ত্রণ</h3>
+        <div class="calibration-grid">
+          <label>মাসিক বাজেট সীমা (টাকা)
+            <input type="number" id="monthlyBudgetLimit" min="0" step="0.01" value="0">
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" onclick="app.saveBudgetSettings()">বাজেট সেভ</button>
+        </div>
+      </div>
       <div class="settings-section" id="trialInfo"></div>
     `;
 
     this.populatePrintCalibration();
+    this.populateBudgetSettings();
 
     if (this.user.trialEnd) {
       const daysLeft = this.getDaysRemaining(this.user.trialEnd);
@@ -1196,6 +1231,11 @@ class VoucherApp {
 
   async updateVoucherWorkflow(voucherId, stage) {
     try {
+      if (!this.isStageAllowedForRole(stage)) {
+        this.showError('এই ধাপের অনুমতি আপনার নেই');
+        return;
+      }
+
       const actor = this.user?.name || this.user?.email || 'User';
       const response = await fetch(`${this.apiBase}/api/voucher/workflow/${voucherId}`, {
         method: 'POST',
@@ -1215,6 +1255,134 @@ class VoucherApp {
       console.error('Workflow update error:', error);
       this.showError('Workflow update ব্যর্থ হয়েছে');
     }
+  }
+
+  isStageAllowedForRole(stage) {
+    const role = this.user?.role || 'user';
+    const map = {
+      user: ['prepared'],
+      admin: ['prepared', 'verified', 'recommended'],
+      super_admin: ['prepared', 'verified', 'recommended', 'approved']
+    };
+    return (map[role] || []).includes(stage);
+  }
+
+  renderWorkflowActionButtons(voucher) {
+    const actions = [
+      { stage: 'prepared', label: 'প্রস্তুত', requires: null },
+      { stage: 'verified', label: 'যাচাই', requires: 'prepared_by' },
+      { stage: 'recommended', label: 'সুপারিশ', requires: 'verified_by' },
+      { stage: 'approved', label: 'অনুমোদন', requires: 'recommended_by' }
+    ];
+
+    return actions
+      .filter((a) => this.isStageAllowedForRole(a.stage))
+      .filter((a) => !a.requires || voucher[a.requires])
+      .map((a) => `<button onclick="app.updateVoucherWorkflow('${voucher.id}', '${a.stage}')" class="btn-small">${a.label}</button>`)
+      .join('');
+  }
+
+  async copyVerifyLink(publicId) {
+    const url = `${window.location.origin}/api/voucher/verify/${publicId}`;
+    await navigator.clipboard.writeText(url);
+    this.showMessage('Verification link কপি হয়েছে');
+  }
+
+  getReconciliationMap() {
+    try {
+      return JSON.parse(localStorage.getItem('bankReconciliationMap') || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  saveReconciliationMap(map) {
+    localStorage.setItem('bankReconciliationMap', JSON.stringify(map));
+  }
+
+  renderBankReconciliation() {
+    const reconMap = this.getReconciliationMap();
+    const list = this.voucherHistory.filter((v) => ['চেক', 'ট্রান্সফার'].includes(v.payment_method || v.paymentMethod || ''));
+
+    if (!list.length) {
+      return '<p>ব্যাংক পেমেন্ট ডাটা নেই</p>';
+    }
+
+    return `
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>ভাউচার</th>
+            <th>পে-টু</th>
+            <th>পদ্ধতি</th>
+            <th>টাকা</th>
+            <th>রিকন স্ট্যাটাস</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map((v) => {
+            const status = reconMap[v.id] || 'pending';
+            return `
+              <tr>
+                <td>${v.voucher_no}</td>
+                <td>${v.pay_to}</td>
+                <td>${v.payment_method || ''}</td>
+                <td>${this.formatAmount(v.amount)}</td>
+                <td>
+                  <select onchange="app.setVoucherReconciliationStatus('${v.id}', this.value)">
+                    <option value="pending" ${status === 'pending' ? 'selected' : ''}>Pending</option>
+                    <option value="cleared" ${status === 'cleared' ? 'selected' : ''}>Cleared</option>
+                    <option value="failed" ${status === 'failed' ? 'selected' : ''}>Failed</option>
+                  </select>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+
+  setVoucherReconciliationStatus(voucherId, status) {
+    const map = this.getReconciliationMap();
+    map[voucherId] = status;
+    this.saveReconciliationMap(map);
+    this.showMessage('রিকনসিলিয়েশন স্ট্যাটাস আপডেট হয়েছে');
+  }
+
+  getBudgetSettings() {
+    try {
+      return JSON.parse(localStorage.getItem('budgetSettings') || '{"monthlyLimit":0}');
+    } catch {
+      return { monthlyLimit: 0 };
+    }
+  }
+
+  getCurrentMonthSpent() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    return this.voucherHistory
+      .filter((v) => {
+        const d = new Date(v.date);
+        return !Number.isNaN(d.getTime()) && d.getFullYear() === y && d.getMonth() === m;
+      })
+      .reduce((sum, v) => sum + (parseFloat(v.amount) || 0), 0);
+  }
+
+  populateBudgetSettings() {
+    const settings = this.getBudgetSettings();
+    const el = document.getElementById('monthlyBudgetLimit');
+    if (el) {
+      el.value = settings.monthlyLimit || 0;
+    }
+  }
+
+  saveBudgetSettings() {
+    const monthlyLimit = parseFloat(document.getElementById('monthlyBudgetLimit')?.value || '0') || 0;
+    localStorage.setItem('budgetSettings', JSON.stringify({ monthlyLimit }));
+    this.showMessage('বাজেট সেটিংস সংরক্ষণ হয়েছে');
+    this.loadReports();
   }
 
   downloadTextFile(filename, content, mimeType) {

@@ -2,7 +2,7 @@
 
 import Database from '../shared/db.js';
 import { requireAuth } from '../shared/auth.js';
-import { generateId, generatePublicId, convertNumberToBangla, getLocalDateString } from '../shared/utils.js';
+import { generateId, generatePublicId, convertNumberToBangla, getLocalDateString, hashToken } from '../shared/utils.js';
 
 // Create voucher
 export async function handleVoucherCreate(request, db, sessionManager) {
@@ -192,9 +192,44 @@ export async function handleVoucherWorkflowUpdate(request, db, sessionManager, v
       approved: 'approvedBy'
     };
 
+    const stagePermissions = {
+      prepared: ['user', 'admin', 'super_admin'],
+      verified: ['admin', 'super_admin'],
+      recommended: ['admin', 'super_admin'],
+      approved: ['super_admin']
+    };
+
+    if (!stagePermissions[stage].includes(session.role)) {
+      return new Response(JSON.stringify({ error: 'You are not allowed for this stage' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (stage === 'verified' && !voucher.prepared_by) {
+      return new Response(JSON.stringify({ error: 'Prepare stage is required first' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (stage === 'recommended' && !voucher.verified_by) {
+      return new Response(JSON.stringify({ error: 'Verify stage is required first' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (stage === 'approved' && !voucher.recommended_by) {
+      return new Response(JSON.stringify({ error: 'Recommend stage is required first' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const updates = {
       [stageFieldMap[stage]]: actor,
-      status: 'saved'
+      status: stage === 'approved' ? 'printed' : 'saved'
     };
 
     await db.updateVoucher(voucherId, updates);
@@ -217,6 +252,52 @@ export async function handleVoucherWorkflowUpdate(request, db, sessionManager, v
     });
   } catch (error) {
     console.error('Voucher workflow update error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+export async function handleVoucherVerify(request, db, publicId) {
+  try {
+    if (!publicId) {
+      return new Response(JSON.stringify({ error: 'Public ID required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const voucher = await db.getVoucherByPublicId(publicId);
+    if (!voucher) {
+      return new Response(JSON.stringify({ error: 'Voucher not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const signatureSource = `${voucher.public_id}|${voucher.voucher_no}|${voucher.amount}|${voucher.date}|${voucher.pay_to}`;
+    const signatureHash = await hashToken(signatureSource);
+    const verificationCode = signatureHash.slice(0, 12).toUpperCase();
+
+    return new Response(JSON.stringify({
+      valid: true,
+      verificationCode,
+      voucher: {
+        publicId: voucher.public_id,
+        voucherNo: voucher.voucher_no,
+        date: voucher.date,
+        payTo: voucher.pay_to,
+        amount: voucher.amount,
+        status: voucher.status,
+        approvedBy: voucher.approved_by || null
+      }
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Voucher verify error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
