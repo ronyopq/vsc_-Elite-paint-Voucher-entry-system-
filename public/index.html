@@ -13,26 +13,43 @@
       box-sizing: border-box;
     }
 
+    :root {
+      --brand: #0f4c81;
+      --brand-deep: #09375e;
+      --accent: #11a39a;
+      --ink: #0f172a;
+      --muted: #5b6b82;
+      --surface: #ffffff;
+      --surface-soft: #f6f9fc;
+      --stroke: #d9e2ec;
+    }
+
     body {
       font-family: 'Inter', 'Noto Serif Bengali', sans-serif;
-      background: linear-gradient(135deg, #0f172a 0%, #1a1f3a 50%, #16213e 100%);
+      background:
+        radial-gradient(circle at 18% 8%, rgba(17, 163, 154, 0.22), transparent 40%),
+        radial-gradient(circle at 85% 18%, rgba(29, 78, 216, 0.18), transparent 38%),
+        linear-gradient(125deg, #07182c 0%, #0d2845 46%, #11385c 100%);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
-      color: #0f172a;
+      color: var(--ink);
     }
 
     .auth-container {
       position: relative;
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      padding: 40px;
-      max-width: 420px;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 20px;
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.35);
+      padding: 42px;
+      max-width: 460px;
       width: 100%;
       text-align: left;
+      -webkit-backdrop-filter: blur(5px);
+      backdrop-filter: blur(5px);
     }
 
     .logo {
@@ -42,7 +59,7 @@
       display: grid;
       place-items: center;
       font-size: 28px;
-      background: linear-gradient(135deg, #1e40af 0%, #1e5a96 100%);
+      background: linear-gradient(135deg, var(--brand) 0%, #146598 100%);
       color: #fff;
       margin-bottom: 24px;
       box-shadow: 0 8px 16px rgba(30, 64, 175, 0.25);
@@ -51,13 +68,13 @@
     .auth-container h1 {
       font-size: 28px;
       font-weight: 700;
-      color: #0f172a;
+      color: var(--ink);
       margin-bottom: 8px;
       line-height: 1.3;
     }
 
     .auth-container p {
-      color: #475569;
+      color: var(--muted);
       margin-bottom: 28px;
       font-size: 14px;
       line-height: 1.6;
@@ -72,7 +89,7 @@
     .field-group label {
       display: block;
       margin-bottom: 8px;
-      color: #1e293b;
+      color: #23344d;
       font-size: 13px;
       font-weight: 600;
       text-transform: uppercase;
@@ -93,9 +110,9 @@
 
     .field-group input:focus {
       outline: none;
-      border-color: #1e40af;
+      border-color: var(--brand);
       background: white;
-      box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+      box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.12);
     }
 
     .field-group input::placeholder {
@@ -135,13 +152,13 @@
 
     .local-login-btn {
       color: white;
-      background: linear-gradient(135deg, #1e40af 0%, #1e5a96 100%);
-      box-shadow: 0 4px 12px rgba(30, 64, 175, 0.25);
+      background: linear-gradient(135deg, var(--brand) 0%, #146598 100%);
+      box-shadow: 0 4px 12px rgba(15, 76, 129, 0.32);
     }
 
     .local-login-btn:hover:not(:disabled) {
-      background: linear-gradient(135deg, #1e3a8a 0%, #1a4b7f 100%);
-      box-shadow: 0 8px 20px rgba(30, 64, 175, 0.35);
+      background: linear-gradient(135deg, var(--brand-deep) 0%, #124e80 100%);
+      box-shadow: 0 8px 20px rgba(15, 76, 129, 0.4);
     }
 
     .google-login-btn {
@@ -176,9 +193,9 @@
     }
 
     .hint-box {
-      background: #eff6ff;
-      color: #0c4a6e;
-      border: 1px solid #bfdbfe;
+      background: #eef7ff;
+      color: #0d4d77;
+      border: 1px solid #cde2f4;
       border-radius: 8px;
       padding: 12px 14px;
       font-size: 12px;
@@ -226,7 +243,7 @@
       content: "✓";
       position: absolute;
       left: 0;
-      color: #0ea5e9;
+      color: var(--accent);
       font-weight: 700;
       font-size: 16px;
     }
@@ -275,25 +292,29 @@
       display: none;
       width: 100%;
       min-height: 100vh;
-      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      background:
+        radial-gradient(circle at 90% 0%, rgba(17, 163, 154, 0.08), transparent 34%),
+        linear-gradient(135deg, #edf4fb 0%, #f8fbff 45%, #f3f8fd 100%);
       padding: 24px;
     }
 
     .header {
-      background: white;
-      padding: 24px 32px;
-      border-radius: 12px;
+      background: linear-gradient(140deg, #ffffff 0%, #f9fbff 100%);
+      padding: 22px 30px;
+      border-radius: 16px;
       margin-bottom: 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--stroke);
+      box-shadow: 0 10px 30px rgba(7, 24, 44, 0.08);
     }
 
     .header h1 {
-      color: #0f172a;
-      font-size: 28px;
+      color: #16253b;
+      font-size: 30px;
       font-weight: 700;
+      letter-spacing: -0.4px;
     }
 
     .user-info {
@@ -303,13 +324,13 @@
     }
 
     .user-info span {
-      color: #475569;
+      color: var(--muted);
       font-weight: 500;
       font-size: 14px;
     }
 
     .logout-btn {
-      background: #ef4444;
+      background: linear-gradient(135deg, #d93f3f 0%, #c53030 100%);
       color: white;
       border: none;
       padding: 10px 20px;
@@ -322,48 +343,54 @@
     }
 
     .logout-btn:hover {
-      background: #dc2626;
-      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+      box-shadow: 0 6px 14px rgba(217, 63, 63, 0.28);
+      transform: translateY(-1px);
     }
 
     .nav-tabs {
       display: flex;
-      gap: 16px;
+      gap: 12px;
       margin-bottom: 24px;
-      background: white;
-      padding: 16px 32px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      background: #ffffff;
+      padding: 10px;
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      box-shadow: 0 10px 30px rgba(7, 24, 44, 0.06);
       border-bottom: none;
     }
 
     .nav-tabs button {
       background: none;
       border: none;
-      padding: 10px 16px;
+      padding: 10px 18px;
       font-family: 'Inter', sans-serif;
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      color: #64748b;
-      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      border: 1px solid transparent;
+      border-radius: 11px;
       transition: all 0.3s ease;
     }
 
     .nav-tabs button.active {
-      color: #1e40af;
-      border-bottom-color: #1e40af;
+      color: var(--brand-deep);
+      border-color: #bfdaef;
+      background: linear-gradient(140deg, #eef7ff 0%, #eaf8f6 100%);
+      box-shadow: inset 0 0 0 1px rgba(17, 163, 154, 0.16);
     }
 
     .nav-tabs button:hover {
-      color: #1e40af;
+      color: var(--brand);
+      background: #f8fbff;
     }
 
     .content {
-      background: white;
+      background: #ffffff;
       padding: 32px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      border-radius: 16px;
+      border: 1px solid var(--stroke);
+      box-shadow: 0 14px 36px rgba(7, 24, 44, 0.08);
     }
 
     .tab-content {
@@ -377,7 +404,7 @@
     @media (max-width: 640px) {
       .auth-container {
         padding: 32px 24px;
-        border-radius: 12px;
+        border-radius: 16px;
       }
 
       .auth-container h1 {
@@ -388,6 +415,7 @@
         flex-direction: column;
         gap: 16px;
         align-items: flex-start;
+        padding: 18px;
       }
 
       .user-info {
@@ -401,7 +429,7 @@
       }
 
       .content {
-        padding: 20px;
+        padding: 18px;
       }
 
       .dashboard-container {
@@ -415,9 +443,9 @@
 
   <!-- Auth Page -->
   <div class="auth-container" id="authContainer">
-    <div class="logo">🎫</div>
+    <div class="logo">EP</div>
     <h1>এলিট পেইন্ট ভাউচার</h1>
-    <p>নিরাপদ লগইন করে ভাউচার এন্ট্রি, প্রিন্ট এবং রিপোর্ট কাজ শুরু করুন।</p>
+    <p>নিরাপদ লগইন করে কর্পোরেট মানের ভাউচার এন্ট্রি, প্রিন্ট এবং রিপোর্টিং শুরু করুন।</p>
 
     <div class="auth-grid">
       <div class="field-group">
@@ -456,9 +484,9 @@
       <h3>বৈশিষ্ট্য:</h3>
       <ul>
         <li>সহজ ভাউচার এন্ট্রি</li>
-        <li>নিখুঁত আত্মীয় পরিবর্তন প্রিন্ট</li>
+        <li>প্রি-প্রিন্টেড পেপার সাপোর্টেড প্রিন্ট</li>
         <li>স্বয়ংক্রিয় সুপারিশ</li>
-        <li>সপ্তাহিক রিপোর্ট</li>
+        <li>দৈনিক ও মাসিক সারাংশ</li>
         <li>ডিজিটাল শেয়ারিং</li>
       </ul>
     </div>
@@ -468,7 +496,7 @@
   <div class="dashboard-container" id="dashboardContainer">
     <div class="header">
       <div>
-        <h1>🎫 এলিট পেইন্ট ভাউচার</h1>
+        <h1>এলিট পেইন্ট ভাউচার</h1>
       </div>
       <div class="user-info">
         <span id="userName"></span>

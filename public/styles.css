@@ -8,8 +8,8 @@
 
 body {
   font-family: 'Noto Serif Bengali', serif;
-  background: #f5f5f5;
-  color: #333;
+  background: #f4f8fc;
+  color: #1f2f46;
 }
 
 /* Form Styles */
@@ -34,29 +34,31 @@ body {
 }
 
 .form-group label {
-  font-weight: bold;
+  font-weight: 700;
   margin-bottom: 8px;
   font-size: 14px;
-  color: #555;
+  color: #324865;
 }
 
 .form-group input,
 .form-group textarea,
 .form-group select {
   padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1.5px solid #dbe5ef;
+  border-radius: 10px;
   font-family: 'Noto Serif Bengali', serif;
   font-size: 14px;
-  transition: border-color 0.3s ease;
+  background: #fbfdff;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 
 .form-group input:focus,
 .form-group textarea:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #0f4c81;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.12);
 }
 
 .form-group textarea {
@@ -181,17 +183,18 @@ body {
 .auto-btn {
   align-self: flex-start;
   padding: 8px 12px;
-  background: #f0f0f0;
-  border: 1px solid #ddd;
+  background: #eef4fa;
+  border: 1px solid #d7e2ee;
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
   margin-top: 4px;
-  transition: background 0.2s ease;
+  color: #25496d;
+  transition: all 0.2s ease;
 }
 
 .auto-btn:hover {
-  background: #e0e0e0;
+  background: #e4eef9;
 }
 
 /* Button Styles */
@@ -200,24 +203,23 @@ body {
 .btn-small {
   padding: 12px 24px;
   border: none;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
   font-family: 'Noto Serif Bengali', serif;
   font-size: 14px;
   font-weight: bold;
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
 }
 
 .btn-primary {
-  background: #667eea;
+  background: linear-gradient(135deg, #0f4c81 0%, #146598 100%);
   color: white;
   margin-right: 10px;
 }
 
 .btn-primary:hover {
-  background: #5568d3;
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 7px 20px rgba(15, 76, 129, 0.3);
 }
 
 .btn-primary:active {
@@ -225,24 +227,25 @@ body {
 }
 
 .btn-secondary {
-  background: #e0e0e0;
-  color: #333;
+  background: #eef3f8;
+  border: 1px solid #d7e2ee;
+  color: #1f3d5f;
 }
 
 .btn-secondary:hover {
-  background: #d0d0d0;
+  background: #e5edf6;
 }
 
 .btn-small {
   padding: 6px 12px;
   font-size: 12px;
-  background: #667eea;
+  background: #0f4c81;
   color: white;
   margin-right: 5px;
 }
 
 .btn-small:hover {
-  background: #5568d3;
+  background: #0b3a62;
 }
 
 /* Form Actions */
@@ -251,14 +254,14 @@ body {
   gap: 10px;
   margin-top: 30px;
   padding-top: 20px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid #e5edf5;
 }
 
 /* Voucher Preview */
 .voucher-preview {
   margin-top: 30px;
   padding-top: 30px;
-  border-top: 2px solid #eee;
+  border-top: 1px solid #dbe6f2;
 }
 
 .preview-header {
@@ -290,58 +293,61 @@ body {
   width: 100%;
   border-collapse: collapse;
   margin-top: 20px;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #dbe5ef;
 }
 
 .history-table thead {
-  background: #f5f5f5;
+  background: #edf4fb;
 }
 
 .history-table th,
 .history-table td {
   padding: 12px;
   text-align: right;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #e2ebf4;
 }
 
 .history-table th {
-  font-weight: bold;
-  color: #555;
+  font-weight: 700;
+  color: #26466a;
 }
 
 .history-table tbody tr:hover {
-  background: #f9f9f9;
+  background: #f8fbff;
 }
 
 /* Settings */
 .settings-section {
   margin-bottom: 30px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #dfe9f3;
 }
 
 .settings-section h3 {
   margin-bottom: 15px;
-  color: #333;
+  color: #153555;
 }
 
 .settings-section p {
   margin-bottom: 8px;
   font-size: 14px;
-  color: #666;
+  color: #465f7b;
 }
 
 /* Report Styles */
 .report-section {
   margin-bottom: 30px;
   padding: 20px;
-  background: #f9f9f9;
-  border-radius: 6px;
-  border: 1px solid #eee;
+  background: linear-gradient(140deg, #f7fbff 0%, #f0f7ff 100%);
+  border-radius: 12px;
+  border: 1px solid #dbe6f2;
 }
 
 .report-section h3 {
   margin-bottom: 15px;
-  color: #333;
+  color: #17395b;
 }
 
 /* Print Styles */
