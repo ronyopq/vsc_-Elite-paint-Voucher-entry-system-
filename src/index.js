@@ -7,7 +7,7 @@ import { generateId, generatePublicId, getLocalDateString } from '../shared/util
 
 // Import route handlers
 import { handleAuthLogin, handleAuthCallback, handleAuthLogout, handleAuthUser, handleLocalLogin } from '../functions/auth.js';
-import { handleVoucherCreate, handleVoucherGet, handleVoucherGetAll, handleVoucherPublic } from '../functions/voucher.js';
+import { handleVoucherCreate, handleVoucherGet, handleVoucherGetAll, handleVoucherWorkflowUpdate, handleVoucherPublic } from '../functions/voucher.js';
 import { handleSuggestGet, handleSuggestAdd } from '../functions/suggest.js';
 import { handleAdminUsers, handleAdminBlock, handleAdminExtendTrial, handleAdminLoginAs } from '../functions/admin.js';
 
@@ -73,6 +73,8 @@ export default {
           
           if (request.method === 'POST' && action === 'create') {
             return handleVoucherCreate(request, db, sessionManager);
+          } else if (request.method === 'POST' && action === 'workflow' && apiSubpath[1]) {
+            return handleVoucherWorkflowUpdate(request, db, sessionManager, apiSubpath[1]);
           } else if (request.method === 'GET' && action === 'all') {
             return handleVoucherGetAll(request, db, sessionManager);
           } else if (request.method === 'GET' && apiSubpath.length === 1) {

@@ -327,6 +327,55 @@ h3 {
   min-width: 160px;
 }
 
+.history-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.history-search {
+  min-width: 260px;
+  max-width: 360px;
+  width: 100%;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-badge.draft {
+  background: #eff2f6;
+  color: #49607a;
+}
+
+.status-badge.prepared {
+  background: #fff4e5;
+  color: #9a5a00;
+}
+
+.status-badge.verified {
+  background: #e8f4ff;
+  color: #1d5f98;
+}
+
+.status-badge.recommended {
+  background: #f2ebff;
+  color: #5b3d99;
+}
+
+.status-badge.approved {
+  background: #e8f7ec;
+  color: #1c7a43;
+}
+
 .history-table thead {
   background: #edf4fb;
 }
@@ -363,6 +412,21 @@ h3 {
   margin-bottom: 8px;
   font-size: 14px;
   color: #465f7b;
+}
+
+.calibration-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.calibration-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #324865;
 }
 
 /* Report Styles */

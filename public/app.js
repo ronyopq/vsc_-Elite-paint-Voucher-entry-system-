@@ -7,6 +7,7 @@ class VoucherApp {
     this.currentVoucher = null;
     this.voucherHistory = [];
     this.apiBase = '';
+    this.historyFilter = '';
     this.init();
   }
 
@@ -214,6 +215,20 @@ class VoucherApp {
     if (totalAmount <= 0) {
       this.showError('অন্তত একটি টাকার পরিমাণ প্রয়োজন।');
       return;
+    }
+
+    const isLikelyDuplicate = this.voucherHistory.some((v) => {
+      const sameDate = (v.date || '') === document.getElementById('date').value;
+      const samePayTo = String(v.pay_to || '').trim().toLowerCase() === String(document.getElementById('payTo').value || '').trim().toLowerCase();
+      const sameAmount = Math.abs((parseFloat(v.amount) || 0) - totalAmount) < 0.001;
+      return sameDate && samePayTo && sameAmount;
+    });
+
+    if (isLikelyDuplicate) {
+      const confirmed = confirm('একই তারিখ, নাম ও টাকার একটি ভাউচার আগেই আছে। তবুও সংরক্ষণ করতে চান?');
+      if (!confirmed) {
+        return;
+      }
     }
 
     const voucherData = {
@@ -810,6 +825,13 @@ class VoucherApp {
     const rows = this.parseVoucherRows(voucher);
     const total = rows.reduce((sum, row) => sum + (row.amount || 0), 0) || (parseFloat(voucher.amount) || 0);
     const dateParts = this.getDateParts(voucher.date);
+    const calibration = this.getPrintCalibrationSettings();
+
+    const baseTopRows = [7.11, 7.76, 8.41, 9.06, 9.71];
+    const calibratedTopRows = baseTopRows.map((top, idx) => (top + calibration.offsetYCm + (calibration.lineGapCm * idx)).toFixed(2));
+
+    const leftBasePart = (0.8 + calibration.offsetXCm).toFixed(2);
+    const leftBaseAmount = (15.65 + calibration.offsetXCm).toFixed(2);
 
     return `
       <div class="print-sheet">
@@ -822,6 +844,17 @@ class VoucherApp {
 
         <div class="pf pf-payto">${this.escapeHtml(voucher.payTo || '')}</div>
         <div class="pf pf-control">${this.escapeHtml(voucher.controlAc || '')}</div>
+
+        <style>
+          .print-sheet { font-size: ${calibration.fontSizePx}px; }
+          .pf-part { left: ${leftBasePart}cm; width: 14.7cm; }
+          .pf-amt { left: ${leftBaseAmount}cm; width: 3.95cm; text-align: right; }
+          .p1, .a1 { top: ${calibratedTopRows[0]}cm; }
+          .p2, .a2 { top: ${calibratedTopRows[1]}cm; }
+          .p3, .a3 { top: ${calibratedTopRows[2]}cm; }
+          .p4, .a4 { top: ${calibratedTopRows[3]}cm; }
+          .p5, .a5 { top: ${calibratedTopRows[4]}cm; }
+        </style>
 
         ${rows.map((row, idx) => `
           <div class="pf pf-part p${idx + 1}">${this.escapeHtml(row.text)}</div>
@@ -920,14 +953,27 @@ class VoucherApp {
 
       this.voucherHistory = data.vouchers || [];
       this.displayVoucherHistory();
+      this.loadReports();
     } catch (error) {
       console.error('Load history error:', error);
     }
   }
 
   displayVoucherHistory() {
+    const query = this.historyFilter.trim().toLowerCase();
+    const filteredVouchers = this.voucherHistory.filter((v) => {
+      if (!query) return true;
+      const text = `${v.voucher_no || ''} ${v.pay_to || ''} ${v.control_ac || ''} ${v.code_no || ''}`.toLowerCase();
+      return text.includes(query);
+    });
+
     const historyHTML = `
       <h2>ভাউচার ইতিহাস</h2>
+      <div class="history-toolbar">
+        <input type="text" id="historySearch" class="history-search" placeholder="নম্বর/নাম দিয়ে খুঁজুন..." value="${this.escapeHtml(this.historyFilter)}" oninput="app.setHistoryFilter(this.value)">
+        <button class="btn-secondary" onclick="app.exportVouchersCSV()">CSV Export</button>
+        <button class="btn-secondary" onclick="app.exportVouchersJSON()">JSON Export</button>
+      </div>
       <table class="history-table">
         <thead>
           <tr>
@@ -935,19 +981,25 @@ class VoucherApp {
             <th>নম্বর</th>
             <th>যাকে দিতে হবে</th>
             <th>পরিমাণ</th>
+            <th>অবস্থা</th>
             <th>অ্যাকশন</th>
           </tr>
         </thead>
         <tbody>
-          ${this.voucherHistory.map(v => `
+          ${filteredVouchers.map(v => `
             <tr>
               <td>${v.date}</td>
               <td>${v.voucher_no}</td>
               <td>${v.pay_to}</td>
-              <td>${v.amount}</td>
+              <td>${this.formatAmount(v.amount)}</td>
+              <td><span class="status-badge ${this.getWorkflowStatus(v).className}">${this.getWorkflowStatus(v).label}</span></td>
               <td>
                 <button onclick="app.viewVoucher('${v.id}')" class="btn-small">দেখুন</button>
                 <button onclick="app.shareVoucher('${v.public_id}')" class="btn-small">শেয়ার</button>
+                <button onclick="app.updateVoucherWorkflow('${v.id}', 'prepared')" class="btn-small">প্রস্তুত</button>
+                <button onclick="app.updateVoucherWorkflow('${v.id}', 'verified')" class="btn-small">যাচাই</button>
+                <button onclick="app.updateVoucherWorkflow('${v.id}', 'recommended')" class="btn-small">সুপারিশ</button>
+                <button onclick="app.updateVoucherWorkflow('${v.id}', 'approved')" class="btn-small">অনুমোদন</button>
               </td>
             </tr>
           `).join('')}
@@ -974,10 +1026,15 @@ class VoucherApp {
     try {
       // Load stats from DB
       const stats = await this.getUserStats();
+      const weekly = this.getWeeklyStats(this.voucherHistory);
       document.getElementById('monthlyStats').innerHTML = `
         <p>মোট ভাউচার: ${stats.total || 0}</p>
         <p>মোট পরিমাণ: ${(stats.total_amount || 0).toLocaleString('bn-BD')} টাকা</p>
       `;
+
+      document.getElementById('weeklyStats').innerHTML = weekly.length
+        ? weekly.map((w) => `<p>${w.label}: ${w.count} টি, ${this.formatAmount(w.total)} টাকা</p>`).join('')
+        : '<p>কোন ডাটা নেই</p>';
     } catch (error) {
       console.error('Load reports error:', error);
     }
@@ -992,8 +1049,31 @@ class VoucherApp {
         <p>ইমেইল: ${this.user.email}</p>
         <p>ভূমিকা: ${this.user.role}</p>
       </div>
+      <div class="settings-section">
+        <h3>প্রিন্ট ক্যালিব্রেশন</h3>
+        <div class="calibration-grid">
+          <label>Horizontal Offset (cm)
+            <input type="number" id="calOffsetX" step="0.01" value="0">
+          </label>
+          <label>Vertical Offset (cm)
+            <input type="number" id="calOffsetY" step="0.01" value="0">
+          </label>
+          <label>Line Gap Increment (cm)
+            <input type="number" id="calLineGap" step="0.01" value="0">
+          </label>
+          <label>Print Font Size (px)
+            <input type="number" id="calFontSize" step="1" min="9" max="16" value="11">
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" onclick="app.savePrintCalibration()">ক্যালিব্রেশন সেভ</button>
+          <button class="btn-secondary" onclick="app.resetPrintCalibration()">রিসেট</button>
+        </div>
+      </div>
       <div class="settings-section" id="trialInfo"></div>
     `;
+
+    this.populatePrintCalibration();
 
     if (this.user.trialEnd) {
       const daysLeft = this.getDaysRemaining(this.user.trialEnd);
@@ -1034,6 +1114,40 @@ class VoucherApp {
     }
   }
 
+  getWeeklyStats(vouchers) {
+    const weekMap = new Map();
+
+    vouchers.forEach((v) => {
+      const d = new Date(v.date);
+      if (Number.isNaN(d.getTime())) return;
+
+      const day = d.getDay();
+      const diffToMonday = (day + 6) % 7;
+      const monday = new Date(d);
+      monday.setDate(d.getDate() - diffToMonday);
+      monday.setHours(0, 0, 0, 0);
+
+      const key = monday.toISOString().slice(0, 10);
+      if (!weekMap.has(key)) {
+        weekMap.set(key, { count: 0, total: 0, start: new Date(monday) });
+      }
+
+      const item = weekMap.get(key);
+      item.count += 1;
+      item.total += parseFloat(v.amount) || 0;
+    });
+
+    return Array.from(weekMap.values())
+      .sort((a, b) => b.start - a.start)
+      .slice(0, 6)
+      .map((w) => {
+        const end = new Date(w.start);
+        end.setDate(end.getDate() + 6);
+        const label = `${w.start.toLocaleDateString('bn-BD')} - ${end.toLocaleDateString('bn-BD')}`;
+        return { label, count: w.count, total: w.total };
+      });
+  }
+
   async viewVoucher(id) {
     try {
       const response = await fetch(`${this.apiBase}/api/voucher/${id}`);
@@ -1058,14 +1172,144 @@ class VoucherApp {
     this.showMessage('লিঙ্ক কপি হয়েছে!');
   }
 
-  autoIncrementVoucher() {
-    // Get last voucher number and increment
-    if (this.voucherHistory.length > 0) {
-      const lastVoucher = this.voucherHistory[0];
-      const lastNum = parseInt(lastVoucher.voucher_no.split('-')[1]) || 0;
-      const nextNum = (lastNum + 1).toString().padStart(3, '0');
-      document.getElementById('voucherNo').value = `VOC-${nextNum}`;
+  setHistoryFilter(value) {
+    this.historyFilter = value || '';
+    this.displayVoucherHistory();
+  }
+
+  getWorkflowStatus(voucher) {
+    if (voucher.approved_by) return { label: 'অনুমোদিত', className: 'approved' };
+    if (voucher.recommended_by) return { label: 'সুপারিশকৃত', className: 'recommended' };
+    if (voucher.verified_by) return { label: 'যাচাইকৃত', className: 'verified' };
+    if (voucher.prepared_by) return { label: 'প্রস্তুত', className: 'prepared' };
+    return { label: 'ড্রাফট', className: 'draft' };
+  }
+
+  async updateVoucherWorkflow(voucherId, stage) {
+    try {
+      const actor = this.user?.name || this.user?.email || 'User';
+      const response = await fetch(`${this.apiBase}/api/voucher/workflow/${voucherId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage, actor })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        this.showError(data.error || 'Workflow update failed');
+        return;
+      }
+
+      this.showMessage('Workflow update সফল হয়েছে');
+      this.loadVoucherHistory();
+    } catch (error) {
+      console.error('Workflow update error:', error);
+      this.showError('Workflow update ব্যর্থ হয়েছে');
     }
+  }
+
+  downloadTextFile(filename, content, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  exportVouchersCSV() {
+    const headers = ['date', 'voucher_no', 'pay_to', 'control_ac', 'amount', 'prepared_by', 'verified_by', 'recommended_by', 'approved_by'];
+    const lines = [headers.join(',')];
+
+    this.voucherHistory.forEach((v) => {
+      const row = headers.map((key) => {
+        const value = String(v[key] ?? '').replace(/"/g, '""');
+        return `"${value}"`;
+      });
+      lines.push(row.join(','));
+    });
+
+    this.downloadTextFile(`vouchers-${new Date().toISOString().slice(0, 10)}.csv`, lines.join('\n'), 'text/csv;charset=utf-8');
+  }
+
+  exportVouchersJSON() {
+    this.downloadTextFile(`vouchers-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(this.voucherHistory, null, 2), 'application/json;charset=utf-8');
+  }
+
+  getPrintCalibrationSettings() {
+    const defaults = { offsetXCm: 0, offsetYCm: 0, lineGapCm: 0, fontSizePx: 11 };
+    try {
+      const raw = localStorage.getItem('printCalibrationSettings');
+      if (!raw) return defaults;
+      const parsed = JSON.parse(raw);
+      return {
+        offsetXCm: Number(parsed.offsetXCm) || 0,
+        offsetYCm: Number(parsed.offsetYCm) || 0,
+        lineGapCm: Number(parsed.lineGapCm) || 0,
+        fontSizePx: Number(parsed.fontSizePx) || 11
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  populatePrintCalibration() {
+    const settings = this.getPrintCalibrationSettings();
+    const fields = {
+      calOffsetX: settings.offsetXCm,
+      calOffsetY: settings.offsetYCm,
+      calLineGap: settings.lineGapCm,
+      calFontSize: settings.fontSizePx
+    };
+
+    Object.entries(fields).forEach(([id, value]) => {
+      const el = document.getElementById(id);
+      if (el) el.value = value;
+    });
+  }
+
+  savePrintCalibration() {
+    const settings = {
+      offsetXCm: parseFloat(document.getElementById('calOffsetX')?.value || '0') || 0,
+      offsetYCm: parseFloat(document.getElementById('calOffsetY')?.value || '0') || 0,
+      lineGapCm: parseFloat(document.getElementById('calLineGap')?.value || '0') || 0,
+      fontSizePx: parseFloat(document.getElementById('calFontSize')?.value || '11') || 11
+    };
+    localStorage.setItem('printCalibrationSettings', JSON.stringify(settings));
+    this.showMessage('প্রিন্ট ক্যালিব্রেশন সংরক্ষণ করা হয়েছে');
+  }
+
+  resetPrintCalibration() {
+    localStorage.removeItem('printCalibrationSettings');
+    this.populatePrintCalibration();
+    this.showMessage('ক্যালিব্রেশন রিসেট হয়েছে');
+  }
+
+  autoIncrementVoucher() {
+    // Format: VOC-YYYYMM-###
+    if (this.voucherHistory.length > 0) {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const prefix = `VOC-${y}${m}-`;
+
+      const monthVouchers = this.voucherHistory.filter(v => String(v.voucher_no || '').startsWith(prefix));
+      let maxSerial = 0;
+      monthVouchers.forEach((v) => {
+        const serial = parseInt(String(v.voucher_no).replace(prefix, ''), 10);
+        if (serial > maxSerial) maxSerial = serial;
+      });
+
+      const nextNum = String(maxSerial + 1).padStart(3, '0');
+      document.getElementById('voucherNo').value = `${prefix}${nextNum}`;
+      return;
+    }
+
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    document.getElementById('voucherNo').value = `VOC-${y}${m}-001`;
   }
 
   setToday() {

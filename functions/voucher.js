@@ -149,6 +149,81 @@ export async function handleVoucherGetAll(request, db, sessionManager) {
   }
 }
 
+// Update workflow stage for a voucher
+export async function handleVoucherWorkflowUpdate(request, db, sessionManager, voucherId) {
+  const [session, authError] = await requireAuth(request, sessionManager);
+
+  if (authError) {
+    return authError;
+  }
+
+  try {
+    const voucher = await db.getVoucher(voucherId);
+    if (!voucher) {
+      return new Response(JSON.stringify({ error: 'Voucher not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (voucher.user_id !== session.userId && session.role !== 'admin' && session.role !== 'super_admin') {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const data = await request.json();
+    const stage = String(data.stage || '').trim().toLowerCase();
+    const actor = data.actor || session.name || session.email || 'System';
+
+    const allowedStages = ['prepared', 'verified', 'recommended', 'approved'];
+    if (!allowedStages.includes(stage)) {
+      return new Response(JSON.stringify({ error: 'Invalid workflow stage' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const stageFieldMap = {
+      prepared: 'preparedBy',
+      verified: 'verifiedBy',
+      recommended: 'recommendedBy',
+      approved: 'approvedBy'
+    };
+
+    const updates = {
+      [stageFieldMap[stage]]: actor,
+      status: 'saved'
+    };
+
+    await db.updateVoucher(voucherId, updates);
+    const updatedVoucher = await db.getVoucher(voucherId);
+
+    await db.logAction(
+      session.userId,
+      `voucher_${stage}`,
+      'voucher',
+      voucherId,
+      JSON.stringify({ stage, actor })
+    );
+
+    return new Response(JSON.stringify({
+      success: true,
+      voucher: updatedVoucher
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Voucher workflow update error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}
+
 // Get public voucher (no auth required)
 export async function handleVoucherPublic(request, db, env) {
   try {
